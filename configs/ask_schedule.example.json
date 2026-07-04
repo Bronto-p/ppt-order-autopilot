@@ -1,0 +1,17 @@
+{
+  "timezone": "Asia/Shanghai",
+  "daily_ask_times": [
+    "10:30",
+    "16:30"
+  ],
+  "reply_check_offsets_minutes": [
+    2,
+    5,
+    10,
+    30,
+    60,
+    120
+  ],
+  "max_asks_per_day_per_contact": 2
+}
+

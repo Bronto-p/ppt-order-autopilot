@@ -1,0 +1,31 @@
+{
+  "deck_title": null,
+  "page_count": null,
+  "aspect_ratio": "16:9",
+  "deadline": null,
+  "deliverables": [
+    "pptx"
+  ],
+  "style": {
+    "keywords": [],
+    "reference_files": []
+  },
+  "source_files": [],
+  "brand_assets": [],
+  "slides": [
+    {
+      "slide_no": 1,
+      "title": null,
+      "purpose": null,
+      "content_source": null,
+      "required_assets": [],
+      "notes": null
+    }
+  ],
+  "approval": {
+    "approval_id": null,
+    "approved_at": null,
+    "approved_by": "owner"
+  }
+}
+

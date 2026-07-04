@@ -1,0 +1,28 @@
+{
+  "type": "jsonl",
+  "record": {
+    "attachment_id": "att_001",
+    "original_filename": "参考风格.png",
+    "saved_path": "02_attachments_raw/from_chat/att_001_参考风格.png",
+    "source_message_id": "msg_008",
+    "source_message_time": "2026-07-05T10:38:00+08:00",
+    "source_sender": "客户",
+    "file_type": "reference_style",
+    "sha256": "sha256:replace_me",
+    "download_status": "success"
+  },
+  "allowed_file_type": [
+    "client_content",
+    "reference_style",
+    "brand_assets",
+    "chat_evidence",
+    "unknown",
+    "failed"
+  ],
+  "allowed_download_status": [
+    "success",
+    "failed",
+    "skipped"
+  ]
+}
+

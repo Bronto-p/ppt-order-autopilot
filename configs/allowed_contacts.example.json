@@ -1,0 +1,12 @@
+{
+  "allowed_contacts": [
+    {
+      "contact_id": "cs_a",
+      "display_name": "客服A",
+      "wecom_alias": "replace_with_exact_wecom_name",
+      "ask_enabled": true,
+      "notes": "企业微信窗口里显示的名称必须完全匹配 wecom_alias"
+    }
+  ]
+}
+

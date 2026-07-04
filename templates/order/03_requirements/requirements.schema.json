@@ -1,0 +1,89 @@
+{
+  "topic": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "purpose": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "page_count": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "deadline": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "price": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "sample_required": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "sample_scope": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": false
+  },
+  "content_materials": {
+    "value": [],
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "reference_style": {
+    "value": [],
+    "evidence": null,
+    "confidence": "missing",
+    "required": false
+  },
+  "brand_assets": {
+    "value": [],
+    "evidence": null,
+    "confidence": "missing",
+    "required": false
+  },
+  "deliverables": {
+    "value": [
+      "pptx"
+    ],
+    "evidence": "default unless customer asks for PDF too",
+    "confidence": "inferred",
+    "required": true
+  },
+  "aspect_ratio": {
+    "value": "16:9",
+    "evidence": "default unless customer specifies otherwise",
+    "confidence": "inferred",
+    "required": true
+  },
+  "speaker_notes": {
+    "value": false,
+    "evidence": null,
+    "confidence": "missing",
+    "required": false
+  },
+  "revision_scope": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": false
+  }
+}
+

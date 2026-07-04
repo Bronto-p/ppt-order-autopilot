@@ -1,0 +1,77 @@
+# PPT Order Autopilot
+
+这是一个 PPT 接单自动化框架骨架。目标不是让 agent 自由操作企业微信和自动接单，而是建立一套有状态、有证据、有审批、有恢复能力的接单系统。
+
+核心原则：
+
+> Computer Use 只做眼睛和手，不能做脑子。
+
+企业微信 UI 操作、截图、下载附件可以进入受限自动化层；接不接、问什么、发什么、样稿怎么走、成品什么时候交付，必须由业务 skill、状态机和人工确认控制。
+
+## 当前交付物
+
+```text
+ppt-order-autopilot/
+├── configs/                 # 白名单、排程、消息策略示例
+├── docs/                    # 系统设计和硬边界文档
+├── ledgers/                 # 全局账本占位
+├── orders/                  # 真实订单目录
+├── skills/                  # 每个业务层的 skill 契约骨架
+├── templates/order/         # 单个订单的标准文件结构模板
+└── tools/                   # 最小初始化和校验工具
+```
+
+## 系统边界
+
+- `wecom-computer-use-operator` 只负责打开企业微信、定位白名单客服、截图、下载附件、发送已批准消息。
+- `wecom-chat-recorder` 只负责完整采集聊天记录，生成覆盖报告、转写文本、消息索引和附件索引。
+- `ppt-order-briefing` 只负责结构化需求、缺失项和冲突项，每个字段必须带证据。
+- `ppt-order-decision` 只负责生成接单建议和待确认话术，不能发送。
+- `ppt-production-core` 只吃干净的 `production_contract.json`，不回头翻企业微信。
+- `ppt-qa-delivery` 只在 QA 通过后生成交付包和交付话术，仍然不能自动发送。
+
+## MVP 范围
+
+第一版只做接单前半段：
+
+1. 固定时间询问白名单客服有没有 PPT 单。
+2. 按 2/5/10/30/60/120 分钟检查回复。
+3. 打开客服发来的聊天记录。
+4. 从顶部到底部截图、OCR、保存附件。
+5. 生成 `chat_coverage_report.md`。
+6. 生成 `order_brief.md`、`requirements.json`、`missing_questions.md`、`conflicts.md`、`decision.md`。
+7. 生成待你确认的话术。
+
+MVP 的成功标准是：
+
+- 不点错人。
+- 不漏读聊天。
+- 不丢附件。
+- 不误发消息。
+- 不重复接单。
+- 中断后能从 `state.json` 恢复。
+
+## 快速开始
+
+初始化一个新订单目录：
+
+```bash
+python3 tools/init_order.py --title "大学生创新创业项目路演PPT"
+```
+
+校验订单硬门槛：
+
+```bash
+python3 tools/validate_order.py orders/2026-07-05_001_大学生创新创业项目路演PPT --gate chat_capture
+python3 tools/validate_order.py orders/2026-07-05_001_大学生创新创业项目路演PPT --gate decision
+```
+
+## 关键文档
+
+- [System Design](docs/SYSTEM_DESIGN.md)
+- [State Machine](docs/STATE_MACHINE.md)
+- [UI Operation Policy](docs/UI_OPERATION_POLICY.md)
+- [Order Folder Contract](docs/ORDER_FOLDER_CONTRACT.md)
+- [Skill Contracts](docs/SKILL_CONTRACTS.md)
+- [MVP Roadmap](docs/MVP_ROADMAP.md)
+

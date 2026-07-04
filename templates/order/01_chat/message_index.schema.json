@@ -1,0 +1,15 @@
+{
+  "type": "jsonl",
+  "record": {
+    "message_id": "msg_001",
+    "screen_ids": [
+      "screen_001"
+    ],
+    "sender": "客户",
+    "sent_at": "2026-07-05T10:12:00+08:00",
+    "text": "我要做一个大创项目路演PPT",
+    "attachments": [],
+    "ocr_confidence": "high"
+  }
+}
+

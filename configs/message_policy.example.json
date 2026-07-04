@@ -1,0 +1,25 @@
+{
+  "auto_send": {
+    "enabled": true,
+    "allowed_message_templates": [
+      {
+        "template_id": "daily_ppt_order_ask",
+        "message": "姐，今天有 PPT 单子吗？有的话我这边可以接。",
+        "allowed_contact_scope": "allowed_contacts_only",
+        "max_per_day_per_contact": 2
+      }
+    ]
+  },
+  "owner_approval_required_for": [
+    "accept_order",
+    "reject_order",
+    "quote_price",
+    "confirm_deadline",
+    "ask_missing_questions",
+    "send_sample",
+    "send_final_delivery",
+    "send_revision_response"
+  ],
+  "duplicate_send_window_minutes": 120
+}
+

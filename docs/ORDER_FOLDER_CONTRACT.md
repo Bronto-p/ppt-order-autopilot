@@ -1,0 +1,89 @@
+# Order Folder Contract
+
+每个订单都必须使用标准目录结构。任何 skill 只能读取和写入自己负责的区域，跨区域写入必须通过 orchestrator。
+
+## 1. 标准目录
+
+```text
+orders/{order_id}_{topic}/
+├── 00_state/
+│   ├── state.json
+│   ├── events.jsonl
+│   └── approvals.jsonl
+├── 01_chat/
+│   ├── screenshots/
+│   ├── ocr/
+│   ├── chat_transcript.md
+│   ├── chat_coverage_report.md
+│   └── message_index.jsonl
+├── 02_attachments_raw/
+│   ├── from_chat/
+│   ├── from_customer/
+│   ├── attachment_index.jsonl
+│   └── failed_downloads.md
+├── 03_requirements/
+│   ├── order_brief.md
+│   ├── requirements.json
+│   ├── missing_questions.md
+│   ├── conflicts.md
+│   ├── decision.md
+│   └── production_contract.json
+├── 04_sample/
+├── 05_production/
+├── 06_qa/
+└── 07_delivery/
+```
+
+## 2. 聊天覆盖报告
+
+`chat_coverage_report.md` 必须包含：
+
+- 截图总数。
+- 顶部锚点。
+- 底部锚点。
+- 相邻屏幕重叠检查结果。
+- 附件发现数量。
+- 附件下载成功数量。
+- 附件下载失败数量。
+- 疑似冲突数量。
+
+没有覆盖报告，不允许需求提取。
+
+## 3. 附件索引
+
+每个附件必须写入 `attachment_index.jsonl`：
+
+```json
+{
+  "attachment_id": "att_003",
+  "original_filename": "参考风格.png",
+  "saved_path": "02_attachments_raw/from_chat/att_003_参考风格.png",
+  "source_message_time": "2026-07-05T10:38:00+08:00",
+  "source_sender": "客户",
+  "file_type": "reference_style",
+  "sha256": "sha256:...",
+  "download_status": "success"
+}
+```
+
+## 4. 需求字段
+
+`requirements.json` 中每个字段必须有：
+
+```json
+{
+  "value": "大学生创新创业项目路演PPT",
+  "evidence": "客户 10:12: 我要做一个大创项目路演PPT",
+  "confidence": "high",
+  "required": true
+}
+```
+
+如果没有证据，必须标记为 `missing` 或 `inferred`，不能当成确定需求。
+
+## 5. 生产契约
+
+`production_contract.json` 是 PPT 生产层唯一入口。它必须由 briefing 和 decision 后生成，并经过人工确认。
+
+生产层不能直接读取企业微信、聊天截图或未经整理的客服消息。
+
