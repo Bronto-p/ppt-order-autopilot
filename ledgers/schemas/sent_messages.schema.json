@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sent Message Ledger Record",
+  "type": "object",
+  "required": [
+    "event",
+    "contact_id",
+    "message_hash",
+    "timestamp",
+    "status"
+  ],
+  "properties": {
+    "event": {
+      "const": "message_sent"
+    },
+    "order_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "message_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "pre_send_screenshot": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "post_send_screenshot": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "success",
+        "failed",
+        "blocked"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
+

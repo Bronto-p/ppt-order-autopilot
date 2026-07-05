@@ -15,6 +15,7 @@ orders/{order_id}_{topic}/
 │   ├── ocr/
 │   ├── chat_transcript.md
 │   ├── chat_coverage_report.md
+│   ├── coverage_result.json
 │   └── message_index.jsonl
 ├── 02_attachments_raw/
 │   ├── from_chat/
@@ -27,10 +28,13 @@ orders/{order_id}_{topic}/
 │   ├── missing_questions.md
 │   ├── conflicts.md
 │   ├── decision.md
+│   ├── pending_approval.json
 │   └── production_contract.json
 ├── 04_sample/
 ├── 05_production/
 ├── 06_qa/
+│   ├── qa_report.md
+│   └── qa_result.json
 └── 07_delivery/
 ```
 
@@ -48,6 +52,8 @@ orders/{order_id}_{topic}/
 - 疑似冲突数量。
 
 没有覆盖报告，不允许需求提取。
+
+同时必须生成机器可读的 `coverage_result.json`。validator 以 JSON 为准，Markdown 只给人审阅。
 
 ## 3. 附件索引
 
@@ -87,3 +93,8 @@ orders/{order_id}_{topic}/
 
 生产层不能直接读取企业微信、聊天截图或未经整理的客服消息。
 
+## 6. 审批和 QA 结果
+
+`pending_approval.json` 必须包含待发送话术的 `draft_sha256`。Computer Use 发送前必须用这个 hash 做二次校验。
+
+`qa_result.json` 必须是机器可读 QA 结果。只有 `status: "pass"` 才允许进入交付 gate。

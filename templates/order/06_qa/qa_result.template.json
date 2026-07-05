@@ -1,0 +1,27 @@
+{
+  "status": "blocked",
+  "checked_at": null,
+  "required_deliverables": [],
+  "found_deliverables": [],
+  "checks": {
+    "page_count_correct": false,
+    "topic_covered": false,
+    "required_assets_used": false,
+    "text_overflow_checked": false,
+    "small_text_checked": false,
+    "blurry_image_checked": false,
+    "typos_checked": false,
+    "pptx_opens": false,
+    "pdf_exported": false,
+    "file_names_correct": false
+  },
+  "issues": [
+    {
+      "severity": "blocked",
+      "slide": null,
+      "issue": "QA not run yet",
+      "required_action": "Run PPT QA before delivery"
+    }
+  ]
+}
+

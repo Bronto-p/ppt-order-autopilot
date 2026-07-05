@@ -4,7 +4,7 @@
     "10:30",
     "16:30"
   ],
-  "reply_check_offsets_minutes": [
+  "reply_check_offsets_from_send_minutes": [
     2,
     5,
     10,
@@ -14,4 +14,3 @@
   ],
   "max_asks_per_day_per_contact": 2
 }
-

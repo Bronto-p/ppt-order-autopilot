@@ -4,9 +4,13 @@
       "contact_id": "cs_a",
       "display_name": "客服A",
       "wecom_alias": "replace_with_exact_wecom_name",
+      "alternate_names": [],
+      "trusted_window_titles": [],
       "ask_enabled": true,
+      "send_enabled": false,
+      "last_verified_at": null,
+      "risk_level": "normal",
       "notes": "企业微信窗口里显示的名称必须完全匹配 wecom_alias"
     }
   ]
 }
-

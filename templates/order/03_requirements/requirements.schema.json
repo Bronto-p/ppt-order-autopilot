@@ -61,9 +61,10 @@
   },
   "deliverables": {
     "value": [
-      "pptx"
+      "pptx",
+      "pdf"
     ],
-    "evidence": "default unless customer asks for PDF too",
+    "evidence": "default delivery package unless customer specifies otherwise",
     "confidence": "inferred",
     "required": true
   },
@@ -86,4 +87,3 @@
     "required": false
   }
 }
-

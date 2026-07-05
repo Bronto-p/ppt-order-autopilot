@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UI Action Ledger Record",
+  "type": "object",
+  "required": [
+    "event",
+    "action",
+    "timestamp",
+    "status"
+  ],
+  "properties": {
+    "event": {
+      "const": "ui_action"
+    },
+    "action": {
+      "enum": [
+        "open_wecom",
+        "locate_contact",
+        "prepare_message",
+        "commit_send",
+        "check_reply",
+        "open_chat_record",
+        "capture_screen",
+        "download_attachment"
+      ]
+    },
+    "order_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contact_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "approval_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "success",
+        "failed",
+        "blocked"
+      ]
+    },
+    "evidence_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
+

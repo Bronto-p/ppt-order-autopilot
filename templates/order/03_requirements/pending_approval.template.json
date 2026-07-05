@@ -1,0 +1,11 @@
+{
+  "approval_id": null,
+  "action_type": null,
+  "order_id": null,
+  "contact_id": null,
+  "draft_message": null,
+  "draft_sha256": null,
+  "created_at": null,
+  "status": "pending"
+}
+

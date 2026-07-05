@@ -1,13 +1,17 @@
 {
+  "state_version": 1,
   "order_id": "REPLACE_ME",
   "state": "IDLE",
+  "current_gate": "base",
   "fixed_contact": null,
   "last_action": null,
   "next_action": "wait_for_orchestrator",
   "created_at": null,
   "updated_at": null,
+  "last_validated_at": null,
+  "locked_by": null,
+  "lock_expires_at": null,
   "can_send_message": false,
   "requires_owner_approval": false,
   "blocked_reason": null
 }
-

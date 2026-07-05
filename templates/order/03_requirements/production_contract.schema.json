@@ -4,8 +4,13 @@
   "aspect_ratio": "16:9",
   "deadline": null,
   "deliverables": [
-    "pptx"
+    "pptx",
+    "pdf"
   ],
+  "requirements_source": "03_requirements/requirements.json",
+  "asset_allowlist": [],
+  "forbidden_assets": [],
+  "coverage_matrix": [],
   "style": {
     "keywords": [],
     "reference_files": []
@@ -28,4 +33,3 @@
     "approved_by": "owner"
   }
 }
-

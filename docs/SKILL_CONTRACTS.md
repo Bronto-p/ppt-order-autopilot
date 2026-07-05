@@ -102,7 +102,26 @@
 - 自动报价。
 - 自动发送。
 
-## 6. ppt-sample-manager
+## 6. ppt-production-contract-builder
+
+职责：
+
+- 读取 `requirements.json`、`decision.md`、`approvals.jsonl` 和 `attachment_index.jsonl`。
+- 把已确认需求转成 `production_contract.json`。
+- 生成 `asset_allowlist`、`forbidden_assets` 和 `coverage_matrix`。
+
+禁止：
+
+- 不直接操作企业微信。
+- 不自行补缺失需求。
+- 不使用未批准附件。
+
+硬规则：
+
+- 没有 approved approval record，不生成生产契约。
+- contract 中所有素材必须来自附件索引或人工确认的本地路径。
+
+## 7. ppt-sample-manager
 
 职责：
 
@@ -117,7 +136,7 @@
 - 样稿是否需要不能默认。
 - 样稿交付必须人工确认。
 
-## 7. ppt-production-core
+## 8. ppt-production-core
 
 职责：
 
@@ -132,8 +151,9 @@
 - 不读取企业微信。
 - 不自行解释聊天。
 - 不自行补缺失需求。
+- 只能读取 contract 中 allowlist 明确列出的素材。
 
-## 8. ppt-qa-delivery
+## 9. ppt-qa-delivery
 
 职责：
 
@@ -150,4 +170,3 @@
 
 - 没有 QA 通过，不进入交付确认。
 - 交付消息不能自动发送。
-

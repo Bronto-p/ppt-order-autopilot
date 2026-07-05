@@ -40,6 +40,16 @@ REVISION_LOOP
 FAILED_BLOCKED
 ```
 
+机器可执行版本在 `configs/state_machine.json`。该文件不是单纯状态列表；每个 state 都必须定义：
+
+```text
+allowed_next
+required_artifacts
+requires_owner_approval
+```
+
+orchestrator 每次改状态前都要验证旧状态是否允许转到新状态，并确认所需产物和 approval 已存在。
+
 ## 2. 询单分支
 
 ```text
@@ -145,4 +155,3 @@ WAITING_OWNER_CONFIRMATION
   "blocked_reason": null
 }
 ```
-

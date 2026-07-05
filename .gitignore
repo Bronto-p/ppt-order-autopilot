@@ -1,5 +1,33 @@
+# Python / local
 __pycache__/
 *.pyc
+.venv/
+venv/
+.env
+.env.*
 tmp/
 .DS_Store
+*.log
 
+# Runtime private data
+orders/*
+!orders/.gitkeep
+
+# Global runtime ledgers
+ledgers/*.jsonl
+ledgers/*.sqlite
+ledgers/*.db
+!ledgers/README.md
+!ledgers/schemas/
+!ledgers/schemas/**
+
+# Generated deliverables
+*.pptx
+*.pdf
+*.key
+*.zip
+
+# Local app/runtime state
+.codex/
+.playwright/
+screenshots/

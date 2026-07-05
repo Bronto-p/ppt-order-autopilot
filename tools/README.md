@@ -16,6 +16,23 @@ python3 tools/init_order.py --title "大学生创新创业项目路演PPT"
 python3 tools/init_order.py --title "商业计划书" --contact "客服A"
 ```
 
+复制订单模板和 schema：
+
+```bash
+python3 tools/init_order.py --title "商业计划书" --contact "客服A" --with-templates
+```
+
+`init_order.py` 会初始化本地运行时 ledger 文件：
+
+```text
+ledgers/orders.jsonl
+ledgers/sent_messages.jsonl
+ledgers/ui_actions.jsonl
+ledgers/approvals.jsonl
+```
+
+这些 JSONL 文件被 `.gitignore` 忽略，不能提交到公开仓库。
+
 ## validate_order.py
 
 按 gate 校验订单硬门槛：
@@ -35,3 +52,11 @@ python3 tools/validate_order.py orders/2026-07-05_001_商业计划书 --gate dec
 - `qa`
 - `delivery`
 
+## Minimal Runbook
+
+1. `init_order.py --with-templates` 创建订单。
+2. 写入真实 `coverage_result.json`、`message_index.jsonl`、`attachment_index.jsonl` 后跑 `--gate chat_capture`。
+3. 写入 `requirements.json` 后跑 `--gate briefing`。
+4. 写入 `pending_approval.json` 和 `decision.md` 后跑 `--gate decision`。
+5. 写入 approved approval record 和 `production_contract.json` 后跑 `--gate production`。
+6. 写入交付物、`qa_result.json` 和 `qa_report.md` 后跑 `--gate qa`。

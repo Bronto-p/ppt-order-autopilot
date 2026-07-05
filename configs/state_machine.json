@@ -1,48 +1,370 @@
 {
+  "version": 1,
   "initial_state": "IDLE",
   "terminal_states": [
     "NO_REPLY_STOPPED",
     "DELIVERED",
     "FAILED_BLOCKED"
   ],
-  "states": [
-    "IDLE",
-    "SCHEDULED_ASK",
-    "ASK_SENT",
-    "WAITING_REPLY_2M",
-    "WAITING_REPLY_5M",
-    "WAITING_REPLY_10M",
-    "WAITING_REPLY_30M",
-    "WAITING_REPLY_1H",
-    "WAITING_REPLY_2H",
-    "NO_REPLY_STOPPED",
-    "REPLY_DETECTED",
-    "OPENING_CHAT_RECORD",
-    "CAPTURING_CHAT_FROM_TOP",
-    "CAPTURE_GAP_DETECTED",
-    "SAVING_ATTACHMENTS",
-    "BUILDING_TRANSCRIPT",
-    "EXTRACTING_ORDER_BRIEF",
-    "NEEDS_MISSING_QUESTIONS",
-    "READY_FOR_OWNER_DECISION",
-    "WAITING_OWNER_CONFIRMATION",
-    "ASK_CUSTOMER_OR_ACCEPT_ORDER",
-    "SAMPLE_REQUIRED",
-    "DIRECT_PRODUCTION_ALLOWED",
-    "SAMPLE_PRODUCTION",
-    "SAMPLE_QA",
-    "WAITING_SAMPLE_APPROVAL",
-    "FULL_PRODUCTION",
-    "FULL_QA",
-    "DELIVERY_READY",
-    "WAITING_OWNER_DELIVERY_CONFIRMATION",
-    "DELIVERED",
-    "REVISION_LOOP",
-    "FAILED_BLOCKED"
-  ],
   "hard_stop_states": [
     "CAPTURE_GAP_DETECTED",
     "FAILED_BLOCKED"
-  ]
+  ],
+  "states": {
+    "IDLE": {
+      "allowed_next": [
+        "SCHEDULED_ASK",
+        "REPLY_DETECTED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [],
+      "requires_owner_approval": false
+    },
+    "SCHEDULED_ASK": {
+      "allowed_next": [
+        "ASK_SENT",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "ASK_SENT": {
+      "allowed_next": [
+        "WAITING_REPLY_2M",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_2M": {
+      "allowed_next": [
+        "WAITING_REPLY_5M",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_5M": {
+      "allowed_next": [
+        "WAITING_REPLY_10M",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_10M": {
+      "allowed_next": [
+        "WAITING_REPLY_30M",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_30M": {
+      "allowed_next": [
+        "WAITING_REPLY_1H",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_1H": {
+      "allowed_next": [
+        "WAITING_REPLY_2H",
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_REPLY_2H": {
+      "allowed_next": [
+        "REPLY_DETECTED",
+        "NO_REPLY_STOPPED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "NO_REPLY_STOPPED": {
+      "allowed_next": [],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "REPLY_DETECTED": {
+      "allowed_next": [
+        "OPENING_CHAT_RECORD",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "OPENING_CHAT_RECORD": {
+      "allowed_next": [
+        "CAPTURING_CHAT_FROM_TOP",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "CAPTURING_CHAT_FROM_TOP": {
+      "allowed_next": [
+        "SAVING_ATTACHMENTS",
+        "CAPTURE_GAP_DETECTED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "01_chat/screenshots"
+      ],
+      "requires_owner_approval": false
+    },
+    "CAPTURE_GAP_DETECTED": {
+      "allowed_next": [
+        "CAPTURING_CHAT_FROM_TOP",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "01_chat/coverage_result.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "SAVING_ATTACHMENTS": {
+      "allowed_next": [
+        "BUILDING_TRANSCRIPT",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "02_attachments_raw/attachment_index.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "BUILDING_TRANSCRIPT": {
+      "allowed_next": [
+        "EXTRACTING_ORDER_BRIEF",
+        "CAPTURE_GAP_DETECTED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "01_chat/chat_coverage_report.md",
+        "01_chat/coverage_result.json",
+        "01_chat/message_index.jsonl",
+        "02_attachments_raw/attachment_index.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "EXTRACTING_ORDER_BRIEF": {
+      "allowed_next": [
+        "NEEDS_MISSING_QUESTIONS",
+        "READY_FOR_OWNER_DECISION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/requirements.json",
+        "03_requirements/order_brief.md"
+      ],
+      "requires_owner_approval": false
+    },
+    "NEEDS_MISSING_QUESTIONS": {
+      "allowed_next": [
+        "WAITING_OWNER_CONFIRMATION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/missing_questions.md",
+        "03_requirements/pending_approval.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "READY_FOR_OWNER_DECISION": {
+      "allowed_next": [
+        "WAITING_OWNER_CONFIRMATION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/decision.md",
+        "03_requirements/pending_approval.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "WAITING_OWNER_CONFIRMATION": {
+      "allowed_next": [
+        "ASK_CUSTOMER_OR_ACCEPT_ORDER",
+        "SAMPLE_REQUIRED",
+        "DIRECT_PRODUCTION_ALLOWED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/pending_approval.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "ASK_CUSTOMER_OR_ACCEPT_ORDER": {
+      "allowed_next": [
+        "WAITING_OWNER_CONFIRMATION",
+        "SAMPLE_REQUIRED",
+        "DIRECT_PRODUCTION_ALLOWED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "00_state/approvals.jsonl"
+      ],
+      "requires_owner_approval": true
+    },
+    "SAMPLE_REQUIRED": {
+      "allowed_next": [
+        "SAMPLE_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_contract.json",
+        "00_state/approvals.jsonl"
+      ],
+      "requires_owner_approval": true
+    },
+    "DIRECT_PRODUCTION_ALLOWED": {
+      "allowed_next": [
+        "FULL_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/production_contract.json",
+        "00_state/approvals.jsonl"
+      ],
+      "requires_owner_approval": true
+    },
+    "SAMPLE_PRODUCTION": {
+      "allowed_next": [
+        "SAMPLE_QA",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_contract.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "SAMPLE_QA": {
+      "allowed_next": [
+        "WAITING_SAMPLE_APPROVAL",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_qa.md"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_SAMPLE_APPROVAL": {
+      "allowed_next": [
+        "FULL_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_delivery_message.md",
+        "00_state/approvals.jsonl"
+      ],
+      "requires_owner_approval": true
+    },
+    "FULL_PRODUCTION": {
+      "allowed_next": [
+        "FULL_QA",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/production_contract.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "FULL_QA": {
+      "allowed_next": [
+        "DELIVERY_READY",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "06_qa/qa_result.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "DELIVERY_READY": {
+      "allowed_next": [
+        "WAITING_OWNER_DELIVERY_CONFIRMATION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "06_qa/qa_result.json",
+        "07_delivery/delivery_message.md"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_OWNER_DELIVERY_CONFIRMATION": {
+      "allowed_next": [
+        "DELIVERED",
+        "REVISION_LOOP",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "07_delivery/delivery_message.md",
+        "00_state/approvals.jsonl"
+      ],
+      "requires_owner_approval": true
+    },
+    "DELIVERED": {
+      "allowed_next": [
+        "REVISION_LOOP"
+      ],
+      "required_artifacts": [
+        "ledgers/sent_messages.jsonl"
+      ],
+      "requires_owner_approval": false
+    },
+    "REVISION_LOOP": {
+      "allowed_next": [
+        "WAITING_OWNER_CONFIRMATION",
+        "FULL_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/requirements.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "FAILED_BLOCKED": {
+      "allowed_next": [],
+      "required_artifacts": [
+        "00_state/events.jsonl"
+      ],
+      "requires_owner_approval": false
+    }
+  }
 }
-

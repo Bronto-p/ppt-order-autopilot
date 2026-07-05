@@ -35,6 +35,9 @@ ppt-order-decision
 owner approval
         |
         v
+ppt-production-contract-builder
+        |
+        v
 ppt-sample-manager / ppt-production-core
         |
         v
@@ -90,6 +93,8 @@ owner delivery approval
 
 ### Production
 
+`ppt-production-contract-builder` 是生产契约构建层。它把已确认需求、审批记录和附件索引转成 `production_contract.json`，并生成素材 allowlist 和需求覆盖矩阵。
+
 `ppt-production-core` 是 PPT 生产层。它只接受 `production_contract.json`，不直接读取企业微信，不自行解释聊天，不自行补需求。
 
 现有的 `full ppt making workflow/skills/ppt-complete-workflow` 可以作为后续生产后端，但接入前必须先由本系统生成干净的生产契约。
@@ -131,4 +136,3 @@ ledgers/
 6. 冲突必须进入 `conflicts.md`。
 7. 接单、报价、样稿、交付必须等人工确认。
 8. 中断恢复只能依赖 `state.json` 和账本，不能依赖对话记忆。
-

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chat Screen Metadata",
+  "type": "object",
+  "required": [
+    "screen_id",
+    "screen_index",
+    "image_path",
+    "ocr_path",
+    "top_visible_message",
+    "bottom_visible_message",
+    "overlap_with_previous"
+  ],
+  "properties": {
+    "screen_id": {
+      "type": "string",
+      "pattern": "^screen_\\d{3,}$"
+    },
+    "screen_index": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "image_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ocr_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "top_visible_message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bottom_visible_message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "visible_time_range": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "has_attachments": {
+      "type": "boolean"
+    },
+    "overlap_with_previous": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_applicable"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
+

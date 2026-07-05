@@ -1,0 +1,19 @@
+{
+  "status": "blocked",
+  "screens_captured": 0,
+  "top_anchor": null,
+  "bottom_anchor": null,
+  "adjacent_overlap_checks": {
+    "passed": 0,
+    "total": 0,
+    "failed_screen_pairs": []
+  },
+  "attachments_found": 0,
+  "attachments_downloaded": 0,
+  "attachments_failed": 0,
+  "suspected_conflicts": 0,
+  "blocking_issues": [
+    "coverage not captured yet"
+  ]
+}
+
