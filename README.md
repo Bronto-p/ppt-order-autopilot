@@ -28,9 +28,9 @@ ppt-order-autopilot/
 - `ppt-order-briefing` 只负责结构化需求、缺失项和冲突项，每个字段必须带证据。
 - `ppt-order-decision` 只负责生成接单建议和待确认话术，不能发送。
 - `ppt-production-contract-builder` 只负责把已确认需求和审批记录转换成 `production_contract.json`。
-- `ppt-style-master-builder` 只负责把已批准样稿转换成 style master 图像锚点和机器规则。
-- `ppt-slide-job-builder` 只负责把 contract 拆成 self-contained 单页 jobs。
-- `ppt-production-core` 只吃干净的 `production_contract.json`，不回头翻企业微信。
+- `ppt-style-master-builder` 只负责把已批准样稿转换成 style kit 图像锚点和机器规则。
+- `ppt-slide-job-packager` 只负责把 contract 拆成每页一个真实材料包。
+- `ppt-production-core` 只吃 slide job bundles，不回头翻企业微信或 raw 附件目录。
 - `ppt-visual-consistency-qa` 只负责检查 style drift、asset fidelity、navigation consistency 和 worker blockers。
 - `ppt-qa-delivery` 只在 QA 通过后生成交付包和交付话术，仍然不能自动发送。
 

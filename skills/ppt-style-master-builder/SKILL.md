@@ -1,6 +1,6 @@
 ---
 name: ppt-style-master-builder
-description: "PPT 样稿风格母版层。把已通过样稿转换成 style_master 图像锚点、approved_sample_reference.json、style_spec.json 和 locked_elements.json，供正稿每页引用。"
+description: "PPT 样稿风格包层。把已通过样稿转换成 style_kit 图像锚点、approved_sample_reference.json、style_kit.json 和 locked_elements.json，供正稿每页引用。"
 ---
 
 # PPT Style Master Builder
@@ -19,23 +19,21 @@ description: "PPT 样稿风格母版层。把已通过样稿转换成 style_mast
 ## Outputs
 
 - `04_sample/approved_sample_reference.json`
-- `04_sample/style_master/style_anchor.png`
-- `04_sample/style_master/template_master.png`
-- `04_sample/style_master/navigation_bar_reference.png`
-- `04_sample/style_master/cover_reference.png`
-- `04_sample/style_master/section_reference.png`
-- `04_sample/style_master/content_reference.png`
-- `04_sample/style_master/data_reference.png`
-- `04_sample/style_master/image_heavy_reference.png`
-- `04_sample/style_master/style_spec.json`
-- `04_sample/style_master/locked_elements.json`
+- `04_sample/style_kit/style_kit.json`
+- `04_sample/style_kit/style_anchor.png`
+- `04_sample/style_kit/template_master.png`
+- `04_sample/style_kit/navigation_bar.png`
+- `04_sample/style_kit/cover_ref.png`
+- `04_sample/style_kit/content_ref.png`
+- `04_sample/style_kit/data_ref.png`
+- `04_sample/style_kit/image_heavy_ref.png`
+- `04_sample/style_kit/locked_elements.json`
 - 统一结果契约 JSON
 
 ## Hard Rules
 
 1. 没有样稿 approval，不生成 approved sample reference。
 2. `style_anchor.png` 和 `template_master.png` 是正稿必要输入。
-3. 有导航条时必须生成 `navigation_bar_reference.png` 和 locked navigation rule。
-4. style master 是图像参考 + JSON 坐标规则，不是纯文字描述。
-5. 正稿每页必须引用 approved sample 或 style master。
-
+3. 有导航条时必须生成 `navigation_bar.png` 和 locked navigation rule。
+4. style kit 是图像参考 + JSON 坐标规则，不是纯文字描述。
+5. 正稿每页必须引用 style kit。

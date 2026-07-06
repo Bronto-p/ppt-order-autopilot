@@ -31,6 +31,7 @@ ORDER_SUBDIRS = [
     "05_production",
     "06_qa",
     "07_delivery",
+    "08_closeout",
 ]
 
 

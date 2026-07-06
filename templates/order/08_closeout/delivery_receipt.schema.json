@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Delivery Receipt",
+  "type": "object",
+  "required": [
+    "sent_at",
+    "sent_to",
+    "files",
+    "delivery_message_sha256",
+    "sent_message_ledger_id",
+    "post_send_screenshot"
+  ],
+  "properties": {
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sent_to": {
+      "type": "string",
+      "minLength": 1
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "type"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "type": {
+            "enum": [
+              "pptx",
+              "pdf",
+              "zip",
+              "other"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "delivery_message_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "sent_message_ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "post_send_screenshot": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}
+

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -366,24 +367,20 @@ def required_requirement_fields(order_dir: Path, result: ValidationResult) -> se
     }
 
 
-def slide_has_role(slide: dict[str, Any], roles: set[str]) -> bool:
-    return any(isinstance(image, dict) and image.get("role") in roles for image in slide.get("input_images", []))
-
-
-def slide_input_paths(slide: dict[str, Any]) -> set[str]:
-    paths: set[str] = set()
-    for image in slide.get("input_images", []):
-        if isinstance(image, dict) and isinstance(image.get("path"), str):
-            paths.add(image["path"])
-    return paths
-
-
 def check_exact_content(label: str, exact_content: Any, result: ValidationResult) -> None:
     result.require(isinstance(exact_content, dict), f"{label} exact_content must be an object")
     if not isinstance(exact_content, dict):
         return
     result.require(has_deep_content(exact_content), f"{label} exact_content is empty")
     result.require(set(exact_content.keys()) - {"topic", "purpose"}, f"{label} exact_content cannot only contain topic/purpose")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
 
 
 def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
@@ -399,38 +396,31 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
     page_count = deck.get("page_count")
     result.require(isinstance(page_count, int) and page_count > 0, "production_contract.deck.page_count must be a positive integer")
 
-    method = contract.get("production_method")
-    result.require(isinstance(method, dict), "production_contract.production_method must be an object")
+    method = contract.get("method")
+    result.require(isinstance(method, dict), "production_contract.method must be an object")
     if isinstance(method, dict):
-        result.require(method.get("method") == "image_model_full_slide_only", "production method must be image_model_full_slide_only")
-        result.require(method.get("parent_may_generate_slides") is False, "parent_may_generate_slides must be false")
+        result.require(method.get("production_mode") == "image_model_full_slide", "production_mode must be image_model_full_slide")
         result.require(method.get("subagents_required") is True, "subagents_required must be true")
-        result.require(method.get("default_worker_reasoning_level") in ALLOWED_WORKER_REASONING, "default worker reasoning must be medium/high")
+        result.require(method.get("default_reasoning_level") in ALLOWED_WORKER_REASONING, "default reasoning must be medium/high")
 
-    style_system = contract.get("style_system")
-    result.require(isinstance(style_system, dict), "production_contract.style_system must be an object")
-    if isinstance(style_system, dict):
-        result.require(bool(path_list(style_system.get("style_anchor_paths"))), "style_system.style_anchor_paths must not be empty")
-        for key in ["template_master_path", "style_spec_path", "locked_elements_path"]:
-            result.require(not is_empty_value(style_system.get(key)), f"style_system.{key} is required")
-        result.require(isinstance(style_system.get("page_family_refs"), dict) and bool(style_system.get("page_family_refs")), "style_system.page_family_refs must not be empty")
+    style_kit = contract.get("style_kit")
+    result.require(isinstance(style_kit, dict), "production_contract.style_kit must be an object")
+    if isinstance(style_kit, dict):
+        result.require(style_kit.get("path") == "04_sample/style_kit/style_kit.json", "style_kit.path must point to 04_sample/style_kit/style_kit.json")
+        result.require(isinstance(style_kit.get("required"), bool), "style_kit.required must be boolean")
 
     asset_registry = contract.get("asset_registry")
     result.require(isinstance(asset_registry, list), "production_contract.asset_registry must be a list")
-    registered_paths: set[str] = set()
+    registered_assets: dict[str, dict[str, Any]] = {}
     if isinstance(asset_registry, list):
         for index, asset in enumerate(asset_registry, start=1):
             result.require(isinstance(asset, dict), f"asset_registry record {index} must be an object")
             if not isinstance(asset, dict):
                 continue
-            for key in ["asset_id", "path", "type", "allowed_use", "fidelity_rule"]:
+            for key in ["asset_id", "asset_role", "source_path", "fidelity_rule", "if_missing"]:
                 result.require(not is_empty_value(asset.get(key)), f"asset_registry record {index} missing {key}")
-            if isinstance(asset.get("path"), str):
-                registered_paths.add(asset["path"])
-
-    asset_allowlist = set(path_list(contract.get("asset_allowlist", [])))
-    forbidden_assets = set(path_list(contract.get("forbidden_assets", [])))
-    result.require(asset_allowlist, "production_contract.asset_allowlist must not be empty")
+            if isinstance(asset.get("asset_id"), str):
+                registered_assets[asset["asset_id"]] = asset
 
     slides = contract.get("slides")
     result.require(isinstance(slides, list), "production_contract.slides must be a list")
@@ -440,7 +430,6 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
         result.require(len(slides) == page_count, "production_contract.slides count must equal deck.page_count")
 
     seen_slide_numbers: set[int] = set()
-    all_input_paths: set[str] = set()
     for index, slide in enumerate(slides, start=1):
         label = f"slide {index}"
         result.require(isinstance(slide, dict), f"{label} must be an object")
@@ -452,47 +441,25 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
             result.require(slide_no not in seen_slide_numbers, f"duplicate slide_no: {slide_no}")
             seen_slide_numbers.add(slide_no)
             label = f"slide {slide_no}"
-        for key in ["title", "page_type", "section"]:
+        for key in ["title", "page_type", "exact_content_source", "job_path"]:
             result.require(not is_empty_value(slide.get(key)), f"{label} missing {key}")
-        check_exact_content(label, slide.get("exact_content"), result)
-        result.require(is_nonempty_collection(slide.get("content_evidence")), f"{label} content_evidence must not be empty")
-        input_images = slide.get("input_images")
-        result.require(isinstance(input_images, list) and bool(input_images), f"{label} input_images must not be empty")
-        if isinstance(input_images, list):
-            for image_index, image in enumerate(input_images, start=1):
-                result.require(isinstance(image, dict), f"{label} input image {image_index} must be an object")
-                if not isinstance(image, dict):
+        asset_ids = slide.get("required_asset_ids")
+        result.require(isinstance(asset_ids, list), f"{label} required_asset_ids must be a list")
+        if isinstance(asset_ids, list):
+            for asset_id in asset_ids:
+                if str(asset_id).startswith(("style_", "template_", "navigation_", "page_family_")):
                     continue
-                for key in ["path", "role", "fidelity_rule", "required"]:
-                    result.require(key in image and not is_empty_value(image.get(key)), f"{label} input image {image_index} missing {key}")
-                if isinstance(image.get("path"), str):
-                    all_input_paths.add(image["path"])
-                if image.get("required") is True:
-                    result.require(not is_empty_value(image.get("fidelity_rule")), f"{label} required image {image_index} missing fidelity_rule")
-        result.require(slide_has_role(slide, STYLE_ANCHOR_ROLES), f"{label} missing approved sample/style anchor input image")
-        result.require(slide_has_role(slide, TEMPLATE_ROLES), f"{label} missing template reference input image")
-        result.require(slide_has_role(slide, PAGE_FAMILY_ROLES), f"{label} missing page family reference input image")
-        layout = slide.get("layout_constraints", {})
-        if isinstance(layout, dict) and layout.get("use_navigation_bar") is True:
-            result.require(slide_has_role(slide, NAVIGATION_ROLES), f"{label} uses navigation but missing navigation reference")
-        worker = slide.get("worker")
-        result.require(isinstance(worker, dict), f"{label} worker must be an object")
-        if isinstance(worker, dict):
-            result.require(worker.get("reasoning_level") in ALLOWED_WORKER_REASONING, f"{label} worker reasoning_level must be medium/high")
-            result.require(worker.get("reasoning_level") != "low", f"{label} worker reasoning_level cannot be low")
-            result.require(not is_empty_value(worker.get("job_file")), f"{label} worker.job_file is required")
-        result.require(is_nonempty_collection(slide.get("qa_requirements")), f"{label} qa_requirements must not be empty")
-
-    result.require(all_input_paths <= asset_allowlist, "all slide input_images paths must be in asset_allowlist")
-    result.require(not (all_input_paths & forbidden_assets), "forbidden_assets must not be referenced by slides")
-    strict_input_paths = {path for path in all_input_paths if path in registered_paths}
-    result.require(strict_input_paths <= asset_allowlist, "registered input assets must be allowlisted")
+                result.require(asset_id in registered_assets, f"{label} references unknown asset_id: {asset_id}")
+        job_path = slide.get("job_path")
+        if isinstance(job_path, str):
+            result.require(job_path == f"05_production/slide_jobs/slide_{slide_no:02d}/job.json", f"{label} job_path must match slide bundle")
 
     coverage = contract.get("coverage_matrix")
-    result.require(isinstance(coverage, list) and bool(coverage), "coverage_matrix must not be empty")
-    covered_sources = " ".join(str(item.get("source", "")) + " " + str(item.get("requirement", "")) for item in coverage if isinstance(item, dict))
-    for field_name in required_requirement_fields(order_dir, result):
-        result.require(field_name in covered_sources, f"coverage_matrix does not cover required requirement: {field_name}")
+    if coverage is not None:
+        result.require(isinstance(coverage, list), "coverage_matrix must be a list when present")
+        covered_sources = " ".join(str(item.get("source", "")) + " " + str(item.get("requirement", "")) for item in coverage if isinstance(item, dict))
+        for field_name in required_requirement_fields(order_dir, result):
+            result.require(field_name in covered_sources, f"coverage_matrix does not cover required requirement: {field_name}")
 
 
 def is_sample_required(order_dir: Path, result: ValidationResult) -> bool:
@@ -513,40 +480,38 @@ def is_sample_required(order_dir: Path, result: ValidationResult) -> bool:
 def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
     check_contract_accuracy(order_dir, result)
     sample_dir = order_dir / "04_sample"
-    style_master = sample_dir / "style_master"
+    style_kit = sample_dir / "style_kit"
     result.require(exists_nonempty(sample_dir / "sample_contract.json") or not is_sample_required(order_dir, result), "sample_required=true requires 04_sample/sample_contract.json")
-    approved = load_json(sample_dir / "approved_sample_reference.json", result, "04_sample/approved_sample_reference.json")
-    if approved:
-        result.require(is_nonempty_collection(approved.get("approved_samples")), "approved_sample_reference.json approved_samples must not be empty")
-        style_system = approved.get("style_system")
-        result.require(isinstance(style_system, dict), "approved_sample_reference.json style_system must be an object")
+    kit = load_json(style_kit / "style_kit.json", result, "04_sample/style_kit/style_kit.json")
+    if kit:
+        result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "style_kit.json approved_sample_paths must not be empty")
+        family_refs = kit.get("page_family_refs")
+        result.require(isinstance(family_refs, dict) and bool(family_refs), "style_kit.json page_family_refs must not be empty")
     for rel_path in [
         "style_anchor.png",
         "template_master.png",
-        "style_spec.json",
+        "style_kit.json",
         "locked_elements.json",
     ]:
-        result.require((style_master / rel_path).exists(), f"missing style master artifact: 04_sample/style_master/{rel_path}")
-    load_json(style_master / "style_spec.json", result, "04_sample/style_master/style_spec.json")
-    load_json(style_master / "locked_elements.json", result, "04_sample/style_master/locked_elements.json")
+        result.require((style_kit / rel_path).exists(), f"missing style kit artifact: 04_sample/style_kit/{rel_path}")
+    load_json(style_kit / "locked_elements.json", result, "04_sample/style_kit/locked_elements.json")
 
 
 def load_slide_jobs(order_dir: Path, result: ValidationResult) -> dict[str, Any] | None:
-    return load_json(order_dir / "05_production" / "slide_jobs.json", result, "05_production/slide_jobs.json")
+    return load_json(order_dir / "05_production" / "slide_jobs" / "slide_jobs.json", result, "05_production/slide_jobs/slide_jobs.json")
 
 
-def check_slide_job_payload(order_dir: Path, job_path: Path, result: ValidationResult, expected_slide_no: int) -> None:
+def check_slide_job_payload(order_dir: Path, job_path: Path, result: ValidationResult, expected_slide_no: int, bundle_dir: Path) -> None:
     rel_label = str(job_path.relative_to(order_dir))
     job = load_json(job_path, result, rel_label)
     if not job:
         return
     result.require(job.get("slide_no") == expected_slide_no, f"{rel_label} slide_no does not match slide_jobs.json")
     check_exact_content(rel_label, job.get("exact_content"), result)
-    for key in ["deck_context", "local_context", "visual_constraints", "backend", "worker_policy"]:
-        result.require(isinstance(job.get(key), dict) and bool(job.get(key)), f"{rel_label} {key} must be a non-empty object")
+    result.require(isinstance(job.get("visual_constraints"), dict) and bool(job.get("visual_constraints")), f"{rel_label} visual_constraints must be a non-empty object")
     input_images = job.get("input_images")
     result.require(isinstance(input_images, list) and bool(input_images), f"{rel_label} input_images must not be empty")
-    roles = {image.get("role") for image in input_images if isinstance(image, dict)}
+    roles = {image.get("role") for image in input_images if isinstance(input_images, list) and isinstance(image, dict)}
     result.require(roles & STYLE_ANCHOR_ROLES, f"{rel_label} missing style anchor input")
     result.require(roles & TEMPLATE_ROLES, f"{rel_label} missing template reference input")
     result.require(roles & PAGE_FAMILY_ROLES, f"{rel_label} missing page family reference input")
@@ -555,17 +520,28 @@ def check_slide_job_payload(order_dir: Path, job_path: Path, result: ValidationR
             if not isinstance(image, dict):
                 result.errors.append(f"{rel_label} input image {image_index} must be an object")
                 continue
+            bundle_path = image.get("bundle_path")
+            result.require(isinstance(bundle_path, str) and bundle_path.startswith("input_images/"), f"{rel_label} input image {image_index} invalid bundle_path")
+            image_path = bundle_dir / bundle_path if isinstance(bundle_path, str) else None
+            if image_path:
+                result.require(image_path.exists(), f"{rel_label} input image {image_index} bundle file missing: {bundle_path}")
+                expected_sha = image.get("sha256")
+                if isinstance(expected_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_sha) and image_path.exists():
+                    result.require(sha256_file(image_path) == expected_sha, f"{rel_label} input image {image_index} sha256 mismatch")
             if image.get("required") is True:
                 result.require(not is_empty_value(image.get("fidelity_rule")), f"{rel_label} required input image {image_index} missing fidelity_rule")
-    backend = job.get("backend")
-    if isinstance(backend, dict):
-        result.require(backend.get("requires_image_inputs") is True, f"{rel_label} backend.requires_image_inputs must be true")
     worker = job.get("worker_policy")
     if isinstance(worker, dict):
         result.require(worker.get("reasoning_level") in ALLOWED_WORKER_REASONING, f"{rel_label} worker reasoning must be medium/high")
         result.require(worker.get("reasoning_level") != "low", f"{rel_label} worker reasoning cannot be low")
-        result.require(worker.get("must_return_blocker_if_image_not_visible") is True, f"{rel_label} must return blocker if image not visible")
+        result.require(worker.get("image_generation_only") is True, f"{rel_label} image_generation_only must be true")
         result.require(worker.get("must_not_use_text_only_fallback") is True, f"{rel_label} must not use text-only fallback")
+        result.require(worker.get("if_required_image_missing") == "block", f"{rel_label} if_required_image_missing must be block")
+        high_required_types = {"cover", "data", "timeline", "process", "old_ppt_redesign"}
+        if job.get("page_type") in high_required_types or (isinstance(job.get("visual_constraints"), dict) and job["visual_constraints"].get("use_navigation_bar") is True):
+            result.require(worker.get("reasoning_level") == "high", f"{rel_label} requires high reasoning")
+        if isinstance(input_images, list) and any(isinstance(img, dict) and img.get("role") == "strict_client_asset" for img in input_images):
+            result.require(worker.get("reasoning_level") == "high", f"{rel_label} strict_client_asset requires high reasoning")
 
 
 def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
@@ -586,13 +562,23 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
         if not isinstance(job_record, dict):
             continue
         slide_no = job_record.get("slide_no")
+        bundle_dir = job_record.get("bundle_dir")
         job_file = job_record.get("job_file")
+        prompt_file = job_record.get("prompt_file")
+        input_images_dir = job_record.get("input_images_dir")
         output_image = job_record.get("output_image")
         result.require(isinstance(slide_no, int), f"slide_jobs.json record {index} missing slide_no")
-        result.require(isinstance(job_file, str) and job_file.startswith("05_production/prompts/"), f"slide_jobs.json record {index} invalid job_file")
+        result.require(isinstance(bundle_dir, str) and bundle_dir.startswith("05_production/slide_jobs/slide_"), f"slide_jobs.json record {index} invalid bundle_dir")
+        result.require(isinstance(job_file, str) and job_file.endswith("/job.json"), f"slide_jobs.json record {index} invalid job_file")
+        result.require(isinstance(prompt_file, str) and prompt_file.endswith("/prompt.md"), f"slide_jobs.json record {index} invalid prompt_file")
+        result.require(isinstance(input_images_dir, str) and input_images_dir.endswith("/input_images"), f"slide_jobs.json record {index} invalid input_images_dir")
         result.require(isinstance(output_image, str) and output_image.startswith("05_production/origin_image/"), f"slide_jobs.json record {index} invalid output_image")
-        if isinstance(slide_no, int) and isinstance(job_file, str):
-            check_slide_job_payload(order_dir, order_dir / job_file, result, slide_no)
+        if isinstance(prompt_file, str):
+            result.require(exists_nonempty(order_dir / prompt_file), f"slide_jobs.json record {index} missing prompt_file")
+        if isinstance(input_images_dir, str):
+            result.require((order_dir / input_images_dir).is_dir(), f"slide_jobs.json record {index} missing input_images_dir")
+        if isinstance(slide_no, int) and isinstance(job_file, str) and isinstance(bundle_dir, str):
+            check_slide_job_payload(order_dir, order_dir / job_file, result, slide_no, order_dir / bundle_dir)
 
 
 def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
@@ -610,13 +596,49 @@ def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
         status = slide.get("status")
         result.require(status in {"recorded", "accepted"}, f"slide_run_state slide {index} status must be recorded/accepted")
         result.require(not slide.get("blockers"), f"slide_run_state slide {index} has blockers")
+        result.require(not is_empty_value(slide.get("render_result_file")), f"slide_run_state slide {index} missing render_result_file")
         result.require(not is_empty_value(slide.get("selected_source")), f"slide_run_state slide {index} missing selected_source")
         result.require(is_nonempty_collection(slide.get("input_images_seen")), f"slide_run_state slide {index} missing input_images_seen")
+
+
+def check_render_results(order_dir: Path, result: ValidationResult) -> None:
+    jobs_payload = load_slide_jobs(order_dir, result)
+    if not jobs_payload:
+        return
+    jobs = jobs_payload.get("jobs")
+    if not isinstance(jobs, list):
+        return
+    for index, job_record in enumerate(jobs, start=1):
+        if not isinstance(job_record, dict):
+            continue
+        slide_no = job_record.get("slide_no", index)
+        result_file = job_record.get("render_result_file")
+        output_image = job_record.get("output_image")
+        result.require(isinstance(result_file, str), f"slide {slide_no} missing render_result_file")
+        if not isinstance(result_file, str):
+            continue
+        render = load_json(order_dir / result_file, result, result_file)
+        if not render:
+            continue
+        result.require(render.get("slide_no") == slide_no, f"{result_file} slide_no mismatch")
+        result.require(render.get("status") == "success", f"{result_file} status must be success")
+        result.require(not render.get("blockers"), f"{result_file} blockers must be empty")
+        result.require(isinstance(output_image, str) and (order_dir / output_image).exists(), f"slide {slide_no} output image missing")
+        result.require(render.get("output_image") == output_image, f"{result_file} output_image must match slide_jobs.json")
+        result.require(is_nonempty_collection(render.get("input_images_seen")), f"{result_file} input_images_seen must not be empty")
+        for fidelity in render.get("asset_fidelity", []):
+            if not isinstance(fidelity, dict):
+                result.errors.append(f"{result_file} asset_fidelity record must be an object")
+                continue
+            result.require(fidelity.get("status") in {"pass", "not_applicable"}, f"{result_file} asset fidelity must pass")
+        result.require(render.get("style_match") != "fail", f"{result_file} style_match must not fail")
+        result.require(render.get("text_readability") == "pass", f"{result_file} text_readability must pass")
 
 
 def check_visual_qa(order_dir: Path, result: ValidationResult) -> None:
     check_slide_jobs(order_dir, result)
     check_slide_run_state(order_dir, result)
+    check_render_results(order_dir, result)
     visual = load_json(order_dir / "05_production" / "visual_qa_result.json", result, "05_production/visual_qa_result.json")
     if not visual:
         return
@@ -696,6 +718,41 @@ def check_delivery(order_dir: Path, result: ValidationResult) -> None:
     result.require(approval_ids(order_dir, result), "missing approved approval record before delivery")
 
 
+def check_file_manifest(order_dir: Path, result: ValidationResult, path: Path, label: str) -> None:
+    payload = load_json(path, result, label)
+    if not payload:
+        return
+    files = payload.get("files")
+    result.require(isinstance(files, list) and bool(files), f"{label} files must not be empty")
+    if not isinstance(files, list):
+        return
+    for index, file_record in enumerate(files, start=1):
+        result.require(isinstance(file_record, dict), f"{label} file {index} must be an object")
+        if not isinstance(file_record, dict):
+            continue
+        rel_path = file_record.get("path")
+        sha = file_record.get("sha256")
+        result.require(isinstance(rel_path, str) and bool(rel_path), f"{label} file {index} missing path")
+        result.require(isinstance(sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", sha), f"{label} file {index} invalid sha256")
+        if isinstance(rel_path, str) and (order_dir / rel_path).exists() and isinstance(sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", sha):
+            result.require(sha256_file(order_dir / rel_path) == sha, f"{label} file {index} sha256 mismatch")
+
+
+def check_closeout(order_dir: Path, result: ValidationResult) -> None:
+    check_delivery(order_dir, result)
+    closeout_dir = order_dir / "08_closeout"
+    result.require(exists_nonempty(closeout_dir / "order_summary.md"), "missing or empty 08_closeout/order_summary.md")
+    result.require(exists_nonempty(closeout_dir / "revision_history.md"), "missing or empty 08_closeout/revision_history.md")
+    result.require(exists_nonempty(closeout_dir / "closeout_checklist.md"), "missing or empty 08_closeout/closeout_checklist.md")
+    check_file_manifest(order_dir, result, closeout_dir / "final_files_manifest.json", "08_closeout/final_files_manifest.json")
+    check_file_manifest(order_dir, result, closeout_dir / "delivery_receipt.json", "08_closeout/delivery_receipt.json")
+    payment = load_json(closeout_dir / "payment_status.json", result, "08_closeout/payment_status.json")
+    if payment:
+        result.require(payment.get("status") in {"unknown", "pending", "partial", "paid", "waived"}, "payment_status.json status is invalid")
+    sent_records = load_jsonl(project_root() / "ledgers" / "sent_messages.jsonl", result, "ledgers/sent_messages.jsonl", False)
+    result.require(bool(sent_records), "closeout requires sent message ledger record")
+
+
 GATES: dict[str, Callable[[Path, ValidationResult], None]] = {
     "base": check_base,
     "chat_capture": check_chat_capture,
@@ -708,6 +765,7 @@ GATES: dict[str, Callable[[Path, ValidationResult], None]] = {
     "visual_qa": check_visual_qa,
     "qa": check_qa,
     "delivery": check_delivery,
+    "closeout": check_closeout,
 }
 
 

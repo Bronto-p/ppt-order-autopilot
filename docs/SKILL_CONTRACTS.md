@@ -149,19 +149,20 @@
 - 没有 approved sample，不生成 style master。
 - style master 必须包含图像参考和 locked element 规则。
 
-## 9. ppt-slide-job-builder
+## 9. ppt-slide-job-packager
 
 职责：
 
-- 读取 `production_contract.json`、approved samples 和 style master。
-- 生成 `slide_jobs.json` 和每页 `prompts/slide_XX.json`。
-- 确保每个单页 job self-contained。
+- 读取 `production_contract.json`、style kit 和 raw attachments。
+- 为每页生成 `slide_jobs/slide_XX/job.json`、`prompt.md` 和 `input_images/`。
+- 确保每个单页材料包 self-contained。
 
 硬规则：
 
 - required client asset 必须进入对应页 `input_images`。
 - worker reasoning level 不能是 low。
 - 缺 required image 必须 blocker，不能 text-only fallback。
+- production core 和 subagent 不能再读 raw attachment folder。
 
 ## 10. ppt-production-core
 

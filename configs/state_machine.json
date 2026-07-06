@@ -3,7 +3,7 @@
   "initial_state": "IDLE",
   "terminal_states": [
     "NO_REPLY_STOPPED",
-    "DELIVERED",
+    "ORDER_CLOSED",
     "FAILED_BLOCKED"
   ],
   "hard_stop_states": [
@@ -330,7 +330,7 @@
     },
     "WAITING_OWNER_DELIVERY_CONFIRMATION": {
       "allowed_next": [
-        "DELIVERED",
+        "DELIVERY_SENT",
         "REVISION_LOOP",
         "FAILED_BLOCKED"
       ],
@@ -340,12 +340,34 @@
       ],
       "requires_owner_approval": true
     },
-    "DELIVERED": {
+    "DELIVERY_SENT": {
       "allowed_next": [
+        "WAITING_CLIENT_FEEDBACK",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "08_closeout/delivery_receipt.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_CLIENT_FEEDBACK": {
+      "allowed_next": [
+        "REVISION_LOOP",
+        "CLIENT_ACCEPTED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "08_closeout/delivery_receipt.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "CLIENT_ACCEPTED": {
+      "allowed_next": [
+        "ORDER_CLOSED",
         "REVISION_LOOP"
       ],
       "required_artifacts": [
-        "ledgers/sent_messages.jsonl"
+        "08_closeout/delivery_receipt.json"
       ],
       "requires_owner_approval": false
     },
@@ -359,6 +381,18 @@
         "03_requirements/requirements.json"
       ],
       "requires_owner_approval": true
+    },
+    "ORDER_CLOSED": {
+      "allowed_next": [],
+      "required_artifacts": [
+        "08_closeout/order_summary.md",
+        "08_closeout/final_files_manifest.json",
+        "08_closeout/delivery_receipt.json",
+        "08_closeout/revision_history.md",
+        "08_closeout/payment_status.json",
+        "08_closeout/closeout_checklist.md"
+      ],
+      "requires_owner_approval": false
     },
     "FAILED_BLOCKED": {
       "allowed_next": [],

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Slide Jobs",
+  "title": "Bundled Slide Jobs",
   "type": "object",
   "required": [
     "contract_path",
@@ -17,7 +17,11 @@
         "type": "object",
         "required": [
           "slide_no",
+          "bundle_dir",
           "job_file",
+          "prompt_file",
+          "input_images_dir",
+          "render_result_file",
           "output_image"
         ],
         "properties": {
@@ -25,9 +29,25 @@
             "type": "integer",
             "minimum": 1
           },
+          "bundle_dir": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}$"
+          },
           "job_file": {
             "type": "string",
-            "pattern": "^05_production/prompts/slide_\\d{2,}\\.json$"
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/job\\.json$"
+          },
+          "prompt_file": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/prompt\\.md$"
+          },
+          "input_images_dir": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/input_images$"
+          },
+          "render_result_file": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/render_result\\.json$"
           },
           "output_image": {
             "type": "string",

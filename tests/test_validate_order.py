@@ -135,12 +135,16 @@ class ValidateOrderTests(unittest.TestCase):
         )
         return order_dir
 
-    def valid_contract(self, exact_content: dict | None = None) -> dict:
-        exact_content = exact_content if exact_content is not None else {
+    def valid_contract(self, include_job_path: bool = True) -> dict:
+        slide = {
+            "slide_no": 1,
             "title": "测试 PPT",
-            "bullets": ["第一点", "第二点"],
-            "must_render_text": ["测试 PPT"],
+            "page_type": "content",
+            "exact_content_source": "03_requirements/requirements.json",
+            "required_asset_ids": ["style_anchor", "template_master", "page_family_content"],
         }
+        if include_job_path:
+            slide["job_path"] = "05_production/slide_jobs/slide_01/job.json"
         return {
             "deck": {
                 "deck_title": "测试 PPT",
@@ -148,143 +152,86 @@ class ValidateOrderTests(unittest.TestCase):
                 "aspect_ratio": "16:9",
                 "deliverables": ["pptx", "pdf"],
                 "language": "zh-CN",
-                "requirements_source": "03_requirements/requirements.json",
             },
-            "production_method": {
-                "method": "image_model_full_slide_only",
-                "backend": "same_as_sample",
-                "same_backend_as_sample": True,
-                "parent_may_generate_slides": False,
+            "method": {
+                "production_mode": "image_model_full_slide",
                 "subagents_required": True,
-                "default_worker_reasoning_level": "high",
+                "default_reasoning_level": "high",
+                "same_backend_as_sample": True,
                 "forbidden_methods": ["html_css_render", "svg_render", "pillow_slide", "manual_overlay", "python_pptx_native_layout"],
             },
-            "style_system": {
-                "style_anchor_paths": ["04_sample/style_master/style_anchor.png"],
-                "template_master_path": "04_sample/style_master/template_master.png",
-                "navigation_bar_reference_path": "04_sample/style_master/navigation_bar_reference.png",
-                "page_family_refs": {"content": "04_sample/style_master/content_reference.png"},
-                "style_spec_path": "04_sample/style_master/style_spec.json",
-                "locked_elements_path": "04_sample/style_master/locked_elements.json",
-            },
+            "style_kit": {"required": True, "path": "04_sample/style_kit/style_kit.json"},
             "asset_registry": [],
-            "asset_allowlist": [
-                "04_sample/style_master/style_anchor.png",
-                "04_sample/style_master/template_master.png",
-                "04_sample/style_master/content_reference.png",
-            ],
-            "forbidden_assets": [],
-            "slides": [
-                {
-                    "slide_no": 1,
-                    "title": "测试 PPT",
-                    "page_type": "content",
-                    "section": "正文",
-                    "exact_content": exact_content,
-                    "content_evidence": [{"source": "03_requirements/requirements.json", "field": "topic"}],
-                    "input_images": [
-                        {
-                            "path": "04_sample/style_master/style_anchor.png",
-                            "role": "style_anchor",
-                            "fidelity_rule": "style reference only",
-                            "required": True,
-                        },
-                        {
-                            "path": "04_sample/style_master/template_master.png",
-                            "role": "template_reference",
-                            "fidelity_rule": "preserve layout system and spacing",
-                            "required": True,
-                        },
-                        {
-                            "path": "04_sample/style_master/content_reference.png",
-                            "role": "page_family_reference",
-                            "fidelity_rule": "style reference only",
-                            "required": True,
-                        },
-                    ],
-                    "layout_constraints": {"use_navigation_bar": False},
-                    "must_preserve": ["exact title text"],
-                    "forbidden_changes": ["do not change title"],
-                    "worker": {"reasoning_level": "high", "job_file": "05_production/prompts/slide_01.json"},
-                    "qa_requirements": ["text_readable", "style_matches_anchor"],
-                }
-            ],
+            "slides": [slide],
             "coverage_matrix": [
                 {"requirement": "topic", "source": "requirements.topic", "covered_by": ["slide_01"]},
-                {"requirement": "sample_required", "source": "requirements.sample_required", "covered_by": ["production_method"]},
+                {"requirement": "sample_required", "source": "requirements.sample_required", "covered_by": ["method"]},
             ],
             "approval": {"approval_id": "appr_test", "approved_by": "owner", "approved_at": "2026-07-06T10:03:00+08:00"},
         }
 
-    def add_style_master(self, order_dir: Path) -> None:
-        style_dir = order_dir / "04_sample" / "style_master"
+    def add_style_kit(self, order_dir: Path) -> None:
+        style_dir = order_dir / "04_sample" / "style_kit"
         style_dir.mkdir(parents=True, exist_ok=True)
-        for image_name in ["style_anchor.png", "template_master.png", "content_reference.png"]:
+        for image_name in ["style_anchor.png", "template_master.png", "content_ref.png"]:
             (style_dir / image_name).write_bytes(b"fake-image")
         write_json(
-            order_dir / "04_sample" / "approved_sample_reference.json",
+            style_dir / "style_kit.json",
             {
-                "approved_samples": [
-                    {
-                        "slide_no": 1,
-                        "path": "04_sample/style_master/style_anchor.png",
-                        "use_as": "style_anchor",
-                        "page_family": "content",
-                    }
-                ],
-                "style_system": {
-                    "template_master": "04_sample/style_master/template_master.png",
-                    "style_anchor": "04_sample/style_master/style_anchor.png",
-                    "navigation_bar": None,
-                    "color_behavior": "blue tech",
-                    "typography_behavior": "clear hierarchy",
-                    "image_treatment": "glass panels",
-                },
-                "must_match_in_production": ["palette", "title hierarchy"],
+                "approved_sample_paths": ["04_sample/sample_preview_images/sample_01.png"],
+                "style_anchor": "04_sample/style_kit/style_anchor.png",
+                "template_master": "04_sample/style_kit/template_master.png",
+                "navigation_bar": None,
+                "page_family_refs": {"cover": "04_sample/style_kit/style_anchor.png", "content": "04_sample/style_kit/content_ref.png"},
+                "locked_elements": "04_sample/style_kit/locked_elements.json",
+                "must_match": ["color palette", "title hierarchy"],
             },
         )
-        write_json(style_dir / "style_spec.json", {"palette": {}, "typography": {}, "spacing": {}, "shape_language": "cards", "image_treatment": "clean", "background_treatment": "light"})
-        write_json(style_dir / "locked_elements.json", {"coordinate_space": {"width": 1920, "height": 1080}, "elements": []})
+        write_json(style_dir / "locked_elements.json", {"canvas": {"width": 1920, "height": 1080}})
 
     def add_slide_jobs(self, order_dir: Path, reasoning_level: str = "high") -> None:
-        prompts_dir = order_dir / "05_production" / "prompts"
-        prompts_dir.mkdir(parents=True, exist_ok=True)
+        bundle_dir = order_dir / "05_production" / "slide_jobs" / "slide_01"
+        input_dir = bundle_dir / "input_images"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        for image_name in ["style_anchor.png", "template_master.png", "page_family_ref.png"]:
+            (input_dir / image_name).write_bytes(b"fake-image")
+        (bundle_dir / "prompt.md").write_text("Generate slide 1.", encoding="utf-8")
         write_json(
-            order_dir / "05_production" / "slide_jobs.json",
+            order_dir / "05_production" / "slide_jobs" / "slide_jobs.json",
             {
                 "contract_path": "03_requirements/production_contract.json",
                 "jobs": [
                     {
                         "slide_no": 1,
-                        "job_file": "05_production/prompts/slide_01.json",
+                        "bundle_dir": "05_production/slide_jobs/slide_01",
+                        "job_file": "05_production/slide_jobs/slide_01/job.json",
+                        "prompt_file": "05_production/slide_jobs/slide_01/prompt.md",
+                        "input_images_dir": "05_production/slide_jobs/slide_01/input_images",
+                        "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
                         "output_image": "05_production/origin_image/slide_01.png",
                     }
                 ],
             },
         )
         write_json(
-            prompts_dir / "slide_01.json",
+            bundle_dir / "job.json",
             {
-                "slide_id": "slide_01",
                 "slide_no": 1,
-                "title": "测试 PPT",
                 "page_type": "content",
-                "deck_context": {"deck_theme": "测试", "confirmed_style": "blue tech", "canonical_terms": ["测试"]},
-                "local_context": {"what_this_slide_must_say": "测试内容"},
+                "title": "测试 PPT",
                 "exact_content": {"title": "测试 PPT", "bullets": ["第一点"]},
                 "input_images": [
-                    {"path": "04_sample/style_master/style_anchor.png", "role": "style_anchor", "required": True, "fidelity_rule": "style reference only"},
-                    {"path": "04_sample/style_master/template_master.png", "role": "template_reference", "required": True, "fidelity_rule": "preserve layout system and spacing"},
-                    {"path": "04_sample/style_master/content_reference.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only"},
+                    {"image_id": "style_anchor", "bundle_path": "input_images/style_anchor.png", "role": "style_anchor", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
+                    {"image_id": "template_master", "bundle_path": "input_images/template_master.png", "role": "template_reference", "required": True, "fidelity_rule": "preserve layout system and spacing", "if_missing": "block"},
+                    {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
                 ],
-                "visual_constraints": {"template": "match"},
-                "backend": {"selected_backend": "same_as_sample", "requires_image_inputs": True},
+                "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False, "locked_elements": "use style kit rules if provided"},
                 "worker_policy": {
                     "reasoning_level": reasoning_level,
-                    "must_return_blocker_if_image_not_visible": True,
+                    "image_generation_only": True,
                     "must_not_use_text_only_fallback": True,
+                    "if_required_image_missing": "block",
                 },
-                "qa_requirements": ["text_readable"],
             },
         )
 
@@ -362,18 +309,41 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("topic is required but evidence is empty", result.stdout)
 
-    def test_contract_accuracy_rejects_empty_exact_content(self) -> None:
+    def test_contract_accuracy_rejects_missing_job_path(self) -> None:
         order_dir = self.prepare_order_through_production()
-        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract(exact_content={}))
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract(include_job_path=False))
 
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "contract_accuracy")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("slide 1 exact_content is empty", result.stdout)
+        self.assertIn("slide 1 missing job_path", result.stdout)
+
+    def test_slide_jobs_reject_empty_exact_content(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+        self.add_slide_jobs(order_dir)
+        write_json(order_dir / "05_production" / "slide_jobs" / "slide_01" / "job.json", {
+            "slide_no": 1,
+            "page_type": "content",
+            "title": "测试 PPT",
+            "exact_content": {},
+            "input_images": [
+                {"image_id": "style_anchor", "bundle_path": "input_images/style_anchor.png", "role": "style_anchor", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
+                {"image_id": "template_master", "bundle_path": "input_images/template_master.png", "role": "template_reference", "required": True, "fidelity_rule": "preserve layout system and spacing", "if_missing": "block"},
+                {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
+            ],
+            "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False},
+            "worker_policy": {"reasoning_level": "high", "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
+        })
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exact_content is empty", result.stdout)
 
     def test_slide_jobs_reject_low_reasoning(self) -> None:
         order_dir = self.prepare_order_through_production()
         write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
-        self.add_style_master(order_dir)
+        self.add_style_kit(order_dir)
         self.add_slide_jobs(order_dir, reasoning_level="low")
 
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
@@ -383,8 +353,23 @@ class ValidateOrderTests(unittest.TestCase):
     def test_visual_qa_rejects_invisible_required_asset(self) -> None:
         order_dir = self.prepare_order_through_production()
         write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
-        self.add_style_master(order_dir)
+        self.add_style_kit(order_dir)
         self.add_slide_jobs(order_dir)
+        (order_dir / "05_production" / "origin_image").mkdir(parents=True, exist_ok=True)
+        (order_dir / "05_production" / "origin_image" / "slide_01.png").write_bytes(b"fake-output")
+        write_json(
+            order_dir / "05_production" / "slide_jobs" / "slide_01" / "render_result.json",
+            {
+                "slide_no": 1,
+                "status": "success",
+                "output_image": "05_production/origin_image/slide_01.png",
+                "input_images_seen": ["style_anchor.png"],
+                "asset_fidelity": [],
+                "style_match": "pass",
+                "text_readability": "pass",
+                "blockers": [],
+            },
+        )
         write_json(
             order_dir / "05_production" / "slide_run_state.json",
             {
@@ -392,7 +377,9 @@ class ValidateOrderTests(unittest.TestCase):
                 "slides": [
                     {
                         "slide_no": 1,
-                        "job_file": "05_production/prompts/slide_01.json",
+                        "bundle_dir": "05_production/slide_jobs/slide_01",
+                        "job_file": "05_production/slide_jobs/slide_01/job.json",
+                        "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
                         "status": "accepted",
                         "selected_source": "05_production/origin_image/slide_01.png",
                         "backend_used": "same_as_sample",

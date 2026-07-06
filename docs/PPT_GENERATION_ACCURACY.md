@@ -32,15 +32,15 @@ production_contract.json
 ppt-style-master-builder
         |
         v
-style_master/
+style_kit/
 approved_sample_reference.json
         |
         v
-ppt-slide-job-builder
+ppt-slide-job-packager
         |
         v
-05_production/prompts/slide_XX.json
-slide_jobs.json
+05_production/slide_jobs/slide_XX/job.json
+05_production/slide_jobs/slide_XX/input_images/*
 slide_run_state.json
         |
         v
@@ -62,4 +62,3 @@ repair / regenerate / assemble
 - `sample_accuracy`: validates style master and approved sample reference.
 - `slide_jobs`: validates self-contained one-page jobs.
 - `visual_qa`: validates asset fidelity, style drift, navigation consistency, text readability, and slide run state.
-

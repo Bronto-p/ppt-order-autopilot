@@ -4,11 +4,10 @@
   "type": "object",
   "required": [
     "deck",
-    "production_method",
-    "style_system",
+    "method",
+    "style_kit",
     "asset_registry",
     "slides",
-    "coverage_matrix",
     "approval"
   ],
   "properties": {
@@ -51,47 +50,33 @@
         "language": {
           "type": "string",
           "minLength": 2
-        },
-        "requirements_source": {
-          "type": "string",
-          "default": "03_requirements/requirements.json"
         }
       },
       "additionalProperties": false
     },
-    "production_method": {
+    "method": {
       "type": "object",
       "required": [
-        "method",
-        "backend",
-        "same_backend_as_sample",
-        "parent_may_generate_slides",
+        "production_mode",
         "subagents_required",
-        "default_worker_reasoning_level",
-        "forbidden_methods"
+        "default_reasoning_level",
+        "same_backend_as_sample"
       ],
       "properties": {
-        "method": {
-          "const": "image_model_full_slide_only"
-        },
-        "backend": {
-          "type": "string",
-          "minLength": 1
-        },
-        "same_backend_as_sample": {
-          "type": "boolean"
-        },
-        "parent_may_generate_slides": {
-          "const": false
+        "production_mode": {
+          "const": "image_model_full_slide"
         },
         "subagents_required": {
           "const": true
         },
-        "default_worker_reasoning_level": {
+        "default_reasoning_level": {
           "enum": [
             "medium",
             "high"
           ]
+        },
+        "same_backend_as_sample": {
+          "type": "boolean"
         },
         "forbidden_methods": {
           "type": "array",
@@ -109,48 +94,18 @@
       },
       "additionalProperties": false
     },
-    "style_system": {
+    "style_kit": {
       "type": "object",
       "required": [
-        "style_anchor_paths",
-        "template_master_path",
-        "style_spec_path",
-        "locked_elements_path",
-        "page_family_refs"
+        "required",
+        "path"
       ],
       "properties": {
-        "style_anchor_paths": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+        "required": {
+          "type": "boolean"
         },
-        "template_master_path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "navigation_bar_reference_path": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "page_family_refs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "style_spec_path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "locked_elements_path": {
-          "type": "string",
-          "minLength": 1
+        "path": {
+          "const": "04_sample/style_kit/style_kit.json"
         }
       },
       "additionalProperties": false
@@ -161,20 +116,6 @@
         "$ref": "#/$defs/asset"
       }
     },
-    "asset_allowlist": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "uniqueItems": true
-    },
-    "forbidden_assets": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "uniqueItems": true
-    },
     "slides": {
       "type": "array",
       "minItems": 1,
@@ -184,7 +125,6 @@
     },
     "coverage_matrix": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "$ref": "#/$defs/coverage"
       }
@@ -192,8 +132,7 @@
     "approval": {
       "type": "object",
       "required": [
-        "approval_id",
-        "approved_by"
+        "approval_id"
       ],
       "properties": {
         "approval_id": {
@@ -201,8 +140,7 @@
           "minLength": 1
         },
         "approved_by": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         },
         "approved_at": {
           "type": [
@@ -219,35 +157,28 @@
       "type": "object",
       "required": [
         "asset_id",
-        "path",
-        "type",
-        "allowed_use",
-        "fidelity_rule"
+        "asset_role",
+        "source_path",
+        "fidelity_rule",
+        "if_missing"
       ],
       "properties": {
         "asset_id": {
           "type": "string",
           "minLength": 1
         },
-        "path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "type": {
+        "asset_role": {
           "enum": [
-            "logo",
-            "client_photo",
-            "chart",
-            "screenshot",
-            "certificate",
-            "source_slide_render",
-            "extracted_media",
+            "strict_client_asset",
             "style_reference",
             "template_reference",
-            "whole_slide_reference",
-            "decorative_template_asset",
-            "other"
+            "page_state_reference",
+            "decorative_asset"
           ]
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
         },
         "source_message_id": {
           "type": [
@@ -262,11 +193,20 @@
           ]
         },
         "allowed_use": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fidelity_rule": {
           "type": "string",
           "minLength": 1
         },
-        "fidelity_rule": {
-          "$ref": "#/$defs/fidelity_rule"
+        "if_missing": {
+          "enum": [
+            "block",
+            "omit_if_optional"
+          ]
         }
       },
       "additionalProperties": false
@@ -275,26 +215,16 @@
       "type": "object",
       "required": [
         "slide_no",
-        "title",
         "page_type",
-        "section",
-        "exact_content",
-        "content_evidence",
-        "input_images",
-        "layout_constraints",
-        "must_preserve",
-        "forbidden_changes",
-        "worker",
-        "qa_requirements"
+        "title",
+        "exact_content_source",
+        "required_asset_ids",
+        "job_path"
       ],
       "properties": {
         "slide_no": {
           "type": "integer",
           "minimum": 1
-        },
-        "title": {
-          "type": "string",
-          "minLength": 1
         },
         "page_type": {
           "enum": [
@@ -305,110 +235,28 @@
             "image_heavy",
             "timeline",
             "process",
+            "old_ppt_redesign",
             "closing",
             "custom"
           ]
         },
-        "section": {
+        "title": {
           "type": "string",
           "minLength": 1
         },
-        "exact_content": {
-          "type": "object",
-          "minProperties": 1
-        },
-        "content_evidence": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object"
-          }
-        },
-        "input_images": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/input_image"
-          }
-        },
-        "layout_constraints": {
-          "type": "object"
-        },
-        "must_preserve": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "forbidden_changes": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "worker": {
-          "type": "object",
-          "required": [
-            "reasoning_level",
-            "job_file"
-          ],
-          "properties": {
-            "reasoning_level": {
-              "enum": [
-                "medium",
-                "high"
-              ]
-            },
-            "job_file": {
-              "type": "string",
-              "pattern": "^05_production/prompts/slide_\\d{2,}\\.json$"
-            }
-          },
-          "additionalProperties": false
-        },
-        "qa_requirements": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "input_image": {
-      "type": "object",
-      "required": [
-        "path",
-        "role",
-        "fidelity_rule",
-        "required"
-      ],
-      "properties": {
-        "asset_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "path": {
+        "exact_content_source": {
           "type": "string",
           "minLength": 1
         },
-        "role": {
+        "required_asset_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "job_path": {
           "type": "string",
-          "minLength": 1
-        },
-        "fidelity_rule": {
-          "$ref": "#/$defs/fidelity_rule"
-        },
-        "required": {
-          "type": "boolean"
+          "pattern": "^05_production/slide_jobs/slide_\\d{2,}/job\\.json$"
         }
       },
       "additionalProperties": false
@@ -439,16 +287,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "fidelity_rule": {
-      "enum": [
-        "must use exact supplied image; no redraw or lookalike",
-        "may crop/fit/color-balance only; no content changes",
-        "preserve data, labels, axes, colors; do not redraw",
-        "style reference only",
-        "style reference only; do not copy client content",
-        "preserve layout system and spacing"
-      ]
     }
   },
   "additionalProperties": false

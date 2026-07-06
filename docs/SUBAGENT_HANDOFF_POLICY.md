@@ -1,6 +1,18 @@
 # Subagent Handoff Policy
 
-Each slide worker receives one self-contained JSON job. Workers must not rely on parent chat context, raw attachment folders, or memory from another page.
+Each slide worker receives one self-contained material bundle. Workers must not rely on parent chat context, raw attachment folders, or memory from another page.
+
+```text
+05_production/slide_jobs/slide_07/
+├── job.json
+├── prompt.md
+└── input_images/
+    ├── style_anchor.png
+    ├── template_master.png
+    ├── navigation_bar.png
+    ├── page_family_ref.png
+    └── client_required_image_001.png
+```
 
 ## Required Job Contents
 
@@ -12,6 +24,7 @@ Each slide worker receives one self-contained JSON job. Workers must not rely on
 - `local_context`
 - `exact_content`
 - `input_images`
+- each `input_images[].bundle_path`
 - `visual_constraints`
 - `backend`
 - `worker_policy`
@@ -47,3 +60,8 @@ Workers should return a result that records:
 
 If a required input image is unavailable or not visible to the backend, the worker must return a blocker and must not use a text-only fallback.
 
+## Human Confirmation Boundary
+
+Ask the owner for anything that changes customer commitments: sending messages, accepting/rejecting orders, price, deadline, scope, sample delivery, final delivery, major revision, extra pages, style reset, payment, or repeated QA failures.
+
+Do not ask for internal actions: order folder setup, transcript/OCR, attachment indexing, draft requirements, draft production contract, slide job packaging, first automatic regeneration, PDF export, QA report generation, or delivery message drafting.

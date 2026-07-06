@@ -40,15 +40,25 @@ orders/{order_id}_{topic}/
 │       └── locked_elements.json
 ├── 05_production/
 │   ├── production_blueprint.json
-│   ├── slide_jobs.json
+│   ├── slide_jobs/
 │   ├── slide_run_state.json
-│   ├── prompts/
 │   ├── origin_image/
 │   └── visual_qa_result.json
 ├── 06_qa/
 │   ├── qa_report.md
 │   └── qa_result.json
-└── 07_delivery/
+├── 07_delivery/
+│   ├── delivery_message.md
+│   ├── revision_request.json
+│   ├── revision_decision.md
+│   └── revision_quote_or_scope.md
+└── 08_closeout/
+    ├── order_summary.md
+    ├── final_files_manifest.json
+    ├── delivery_receipt.json
+    ├── revision_history.md
+    ├── payment_status.json
+    └── closeout_checklist.md
 ```
 
 ## 2. 聊天覆盖报告

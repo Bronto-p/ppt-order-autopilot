@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Revision Request",
+  "type": "object",
+  "required": [
+    "revision_type",
+    "feedback",
+    "needs_owner_confirmation"
+  ],
+  "properties": {
+    "revision_type": {
+      "enum": [
+        "content_change",
+        "visual_change",
+        "structure_change",
+        "asset_change",
+        "scope_change"
+      ]
+    },
+    "affected_slides": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "feedback": {
+      "type": "string",
+      "minLength": 1
+    },
+    "interpreted_action": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "needs_owner_confirmation": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}
+

@@ -22,7 +22,9 @@
         "type": "object",
         "required": [
           "slide_no",
+          "bundle_dir",
           "job_file",
+          "render_result_file",
           "status",
           "selected_source",
           "backend_used",
@@ -37,6 +39,14 @@
           "job_file": {
             "type": "string",
             "minLength": 1
+          },
+          "bundle_dir": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}$"
+          },
+          "render_result_file": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/render_result\\.json$"
           },
           "status": {
             "enum": [
@@ -97,4 +107,3 @@
   },
   "additionalProperties": false
 }
-

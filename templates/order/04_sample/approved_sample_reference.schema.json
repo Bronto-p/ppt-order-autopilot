@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "approved_samples",
-    "style_system",
+    "style_kit",
     "must_match_in_production"
   ],
   "properties": {
@@ -46,7 +46,7 @@
         "additionalProperties": false
       }
     },
-    "style_system": {
+    "style_kit": {
       "type": "object",
       "required": [
         "template_master",
@@ -104,4 +104,3 @@
   },
   "additionalProperties": false
 }
-

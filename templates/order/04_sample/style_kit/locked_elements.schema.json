@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Style Kit Locked Elements",
+  "type": "object",
+  "required": [
+    "canvas"
+  ],
+  "properties": {
+    "canvas": {
+      "type": "object",
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "logo": {
+      "$ref": "#/$defs/locked_box"
+    },
+    "navigation_bar": {
+      "$ref": "#/$defs/locked_box"
+    },
+    "footer": {
+      "$ref": "#/$defs/locked_box"
+    },
+    "page_number": {
+      "$ref": "#/$defs/locked_box"
+    }
+  },
+  "$defs": {
+    "locked_box": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h",
+        "rule"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+

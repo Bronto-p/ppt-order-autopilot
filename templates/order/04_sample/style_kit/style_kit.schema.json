@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Style Kit",
+  "type": "object",
+  "required": [
+    "approved_sample_paths",
+    "style_anchor",
+    "template_master",
+    "page_family_refs",
+    "locked_elements",
+    "must_match"
+  ],
+  "properties": {
+    "approved_sample_paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "style_anchor": {
+      "const": "04_sample/style_kit/style_anchor.png"
+    },
+    "template_master": {
+      "const": "04_sample/style_kit/template_master.png"
+    },
+    "navigation_bar": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "page_family_refs": {
+      "type": "object",
+      "required": [
+        "cover",
+        "content"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "locked_elements": {
+      "const": "04_sample/style_kit/locked_elements.json"
+    },
+    "must_match": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "color palette",
+          "background treatment",
+          "title hierarchy",
+          "card radius",
+          "spacing density",
+          "logo position",
+          "navigation geometry"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
+

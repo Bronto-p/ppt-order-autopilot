@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Slide Render Result",
+  "type": "object",
+  "required": [
+    "slide_no",
+    "status",
+    "output_image",
+    "input_images_seen",
+    "asset_fidelity",
+    "style_match",
+    "text_readability",
+    "blockers"
+  ],
+  "properties": {
+    "slide_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "enum": [
+        "success",
+        "blocked",
+        "failed"
+      ]
+    },
+    "output_image": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "input_images_seen": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "asset_fidelity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "asset",
+          "status"
+        ],
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_applicable"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "style_match": {
+      "enum": [
+        "pass",
+        "medium",
+        "fail"
+      ]
+    },
+    "text_readability": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

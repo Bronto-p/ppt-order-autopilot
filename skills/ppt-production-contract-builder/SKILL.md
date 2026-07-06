@@ -24,26 +24,22 @@ description: "PPT 生产契约构建层。把已确认的 requirements、decisio
 
 ## Required Contract Fields
 
-- `deck_title`
-- `page_count`
-- `aspect_ratio`
-- `deadline`
-- `deliverables`
+- `deck.title`
+- `deck.page_count`
+- `deck.aspect_ratio`
+- `deck.deadline`
+- `deck.deliverables`
 - `deck.requirements_source`
-- `production_method`
-- `style_system`
+- `method`
+- `style_kit`
 - `asset_registry`
-- `asset_allowlist`
-- `forbidden_assets`
+- `slides[].slide_no`
+- `slides[].page_type`
+- `slides[].title`
+- `slides[].exact_content_source`
+- `slides[].required_asset_ids`
+- `slides[].job_path`
 - `coverage_matrix`
-- `source_files`
-- `brand_assets`
-- `slides[].exact_content`
-- `slides[].input_images`
-- `slides[].must_preserve`
-- `slides[].forbidden_changes`
-- `slides[].worker`
-- `slides[].qa_requirements`
 - `approval.approval_id`
 
 ## Hard Rules
@@ -54,5 +50,5 @@ description: "PPT 生产契约构建层。把已确认的 requirements、decisio
 4. 所有素材必须来自 `attachment_index.jsonl` 或人工确认的本地路径。
 5. 生产契约必须写清楚每个客户要求覆盖到哪些 slide。
 6. 每个 strict client asset 必须分配到具体 slide。
-7. 每页必须包含 approved sample/style anchor、template reference 和 page family reference。
-8. 有导航条的页必须包含 navigation reference。
+7. `production_contract.json` 只保存总契约和每页 `job_path`，不内嵌完整执行包。
+8. 每页执行材料由 `ppt-slide-job-packager` 写入 `05_production/slide_jobs/slide_XX/`。
