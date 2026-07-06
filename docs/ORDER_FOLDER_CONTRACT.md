@@ -31,7 +31,20 @@ orders/{order_id}_{topic}/
 │   ├── pending_approval.json
 │   └── production_contract.json
 ├── 04_sample/
+│   ├── sample_contract.json
+│   ├── approved_sample_reference.json
+│   └── style_master/
+│       ├── style_anchor.png
+│       ├── template_master.png
+│       ├── style_spec.json
+│       └── locked_elements.json
 ├── 05_production/
+│   ├── production_blueprint.json
+│   ├── slide_jobs.json
+│   ├── slide_run_state.json
+│   ├── prompts/
+│   ├── origin_image/
+│   └── visual_qa_result.json
 ├── 06_qa/
 │   ├── qa_report.md
 │   └── qa_result.json

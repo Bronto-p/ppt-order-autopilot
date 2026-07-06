@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Visual QA Result",
+  "type": "object",
+  "required": [
+    "status",
+    "asset_fidelity",
+    "style_drift",
+    "navigation_consistency",
+    "text_readability",
+    "blockers"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "pass",
+        "blocked",
+        "failed"
+      ]
+    },
+    "asset_fidelity": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "required_assets"
+        ],
+        "properties": {
+          "required_assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "asset_id",
+                "visible_in_output",
+                "fidelity_status"
+              ],
+              "properties": {
+                "asset_id": {
+                  "type": "string"
+                },
+                "expected_role": {
+                  "type": "string"
+                },
+                "visible_in_output": {
+                  "type": "boolean"
+                },
+                "fidelity_status": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "not_applicable"
+                  ]
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "style_drift": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slide_no",
+          "palette_match",
+          "typography_match",
+          "background_match",
+          "layout_family_match",
+          "action"
+        ],
+        "properties": {
+          "slide_no": {
+            "type": "integer"
+          },
+          "palette_match": {
+            "enum": [
+              "pass",
+              "medium",
+              "fail"
+            ]
+          },
+          "typography_match": {
+            "enum": [
+              "pass",
+              "medium",
+              "fail"
+            ]
+          },
+          "background_match": {
+            "enum": [
+              "pass",
+              "medium",
+              "fail"
+            ]
+          },
+          "layout_family_match": {
+            "enum": [
+              "pass",
+              "medium",
+              "fail"
+            ]
+          },
+          "action": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "navigation_consistency": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slide_no",
+          "nav_present",
+          "geometry_match",
+          "active_section_correct",
+          "needs_regeneration"
+        ],
+        "properties": {
+          "slide_no": {
+            "type": "integer"
+          },
+          "nav_present": {
+            "type": "boolean"
+          },
+          "geometry_match": {
+            "enum": [
+              "pass",
+              "medium",
+              "fail",
+              "not_applicable"
+            ]
+          },
+          "active_section_correct": {
+            "type": "boolean"
+          },
+          "needs_regeneration": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "text_readability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slide_no",
+          "status"
+        ],
+        "properties": {
+          "slide_no": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

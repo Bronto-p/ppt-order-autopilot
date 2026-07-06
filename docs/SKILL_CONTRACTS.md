@@ -136,7 +136,34 @@
 - 样稿是否需要不能默认。
 - 样稿交付必须人工确认。
 
-## 8. ppt-production-core
+## 8. ppt-style-master-builder
+
+职责：
+
+- 读取样稿产物和 approval。
+- 生成 `approved_sample_reference.json`。
+- 生成 `04_sample/style_master/*` 图像锚点和 JSON 规则。
+
+硬规则：
+
+- 没有 approved sample，不生成 style master。
+- style master 必须包含图像参考和 locked element 规则。
+
+## 9. ppt-slide-job-builder
+
+职责：
+
+- 读取 `production_contract.json`、approved samples 和 style master。
+- 生成 `slide_jobs.json` 和每页 `prompts/slide_XX.json`。
+- 确保每个单页 job self-contained。
+
+硬规则：
+
+- required client asset 必须进入对应页 `input_images`。
+- worker reasoning level 不能是 low。
+- 缺 required image 必须 blocker，不能 text-only fallback。
+
+## 10. ppt-production-core
 
 职责：
 
@@ -152,8 +179,26 @@
 - 不自行解释聊天。
 - 不自行补缺失需求。
 - 只能读取 contract 中 allowlist 明确列出的素材。
+- parent agent 不直接生成页面。
+- 每页必须由生图模型生成完整 slide image。
 
-## 9. ppt-qa-delivery
+## 11. ppt-visual-consistency-qa
+
+职责：
+
+- 检查 required assets 是否可见且未被重画。
+- 检查 style drift。
+- 检查 navigation consistency。
+- 检查 locked elements。
+- 检查 worker blockers。
+- 生成 `visual_qa_result.json` 和四个视觉 QA 报告。
+
+硬规则：
+
+- strict asset fidelity 失败阻塞 assembly。
+- visual QA 不 pass，final QA 不允许 pass。
+
+## 12. ppt-qa-delivery
 
 职责：
 

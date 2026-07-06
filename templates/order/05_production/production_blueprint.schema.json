@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Production Blueprint",
+  "type": "object",
+  "required": [
+    "contract_path",
+    "style_master_path",
+    "slide_jobs_path",
+    "slide_run_state_path",
+    "assembly_policy"
+  ],
+  "properties": {
+    "contract_path": {
+      "const": "03_requirements/production_contract.json"
+    },
+    "style_master_path": {
+      "const": "04_sample/style_master"
+    },
+    "slide_jobs_path": {
+      "const": "05_production/slide_jobs.json"
+    },
+    "slide_run_state_path": {
+      "const": "05_production/slide_run_state.json"
+    },
+    "assembly_policy": {
+      "type": "object",
+      "required": [
+        "full_slide_images_only",
+        "no_native_layout_overrides"
+      ],
+      "properties": {
+        "full_slide_images_only": {
+          "const": true
+        },
+        "no_native_layout_overrides": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+

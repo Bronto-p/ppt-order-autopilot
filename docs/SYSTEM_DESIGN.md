@@ -38,7 +38,16 @@ owner approval
 ppt-production-contract-builder
         |
         v
-ppt-sample-manager / ppt-production-core
+ppt-style-master-builder
+        |
+        v
+ppt-slide-job-builder
+        |
+        v
+ppt-production-core
+        |
+        v
+ppt-visual-consistency-qa
         |
         v
 ppt-qa-delivery
@@ -93,9 +102,13 @@ owner delivery approval
 
 ### Production
 
-`ppt-production-contract-builder` 是生产契约构建层。它把已确认需求、审批记录和附件索引转成 `production_contract.json`，并生成素材 allowlist 和需求覆盖矩阵。
+`ppt-production-contract-builder` 是生产契约构建层。它把已确认需求、审批记录和附件索引转成 `production_contract.json`，并生成素材 allowlist、asset registry、slide input images 和需求覆盖矩阵。
 
-`ppt-production-core` 是 PPT 生产层。它只接受 `production_contract.json`，不直接读取企业微信，不自行解释聊天，不自行补需求。
+`ppt-style-master-builder` 把已批准样稿转换成真实图像锚点、模板母版、导航条参考和 locked element 规则。
+
+`ppt-slide-job-builder` 把 production contract 拆成每页一个 self-contained `slide_XX.json`，每个 job 都必须包含 exact content、input images、style refs、template refs、fidelity rules、backend、worker policy 和 QA requirements。
+
+`ppt-production-core` 是 PPT 生产层。它只接受 `production_contract.json` 和明确 allowlist 的素材，不直接读取企业微信，不自行解释聊天，不自行补需求，不浏览 raw 附件找灵感。
 
 现有的 `full ppt making workflow/skills/ppt-complete-workflow` 可以作为后续生产后端，但接入前必须先由本系统生成干净的生产契约。
 

@@ -312,6 +312,7 @@
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
+        "05_production/visual_qa_result.json",
         "06_qa/qa_result.json"
       ],
       "requires_owner_approval": false

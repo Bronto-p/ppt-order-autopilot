@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Style Spec",
+  "type": "object",
+  "required": [
+    "palette",
+    "typography",
+    "spacing",
+    "shape_language",
+    "image_treatment",
+    "background_treatment"
+  ],
+  "properties": {
+    "palette": {
+      "type": "object",
+      "required": [
+        "primary",
+        "secondary",
+        "background",
+        "accent"
+      ],
+      "properties": {
+        "primary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secondary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "background": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accent": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "typography": {
+      "type": "object",
+      "required": [
+        "title",
+        "subtitle",
+        "body",
+        "caption"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "spacing": {
+      "type": "object"
+    },
+    "shape_language": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image_treatment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "background_treatment": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}
+

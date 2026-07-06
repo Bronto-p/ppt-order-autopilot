@@ -1,8 +1,57 @@
 {
-  "sample_page_count": 1,
-  "sample_goal": "style_check",
-  "use_real_content": true,
-  "reference_files": [],
-  "approval_id": null
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sample Contract",
+  "type": "object",
+  "required": [
+    "sample_page_count",
+    "sample_goal",
+    "use_real_content",
+    "reference_files",
+    "approval_id",
+    "backend"
+  ],
+  "properties": {
+    "sample_page_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sample_goal": {
+      "enum": [
+        "style_check",
+        "content_check",
+        "both"
+      ]
+    },
+    "use_real_content": {
+      "type": "boolean"
+    },
+    "reference_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backend": {
+      "type": "object",
+      "required": [
+        "selected_backend",
+        "requires_image_inputs"
+      ],
+      "properties": {
+        "selected_backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requires_image_inputs": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
 }
-

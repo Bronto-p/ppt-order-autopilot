@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Slide Jobs",
+  "type": "object",
+  "required": [
+    "contract_path",
+    "jobs"
+  ],
+  "properties": {
+    "contract_path": {
+      "const": "03_requirements/production_contract.json"
+    },
+    "jobs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "slide_no",
+          "job_file",
+          "output_image"
+        ],
+        "properties": {
+          "slide_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "job_file": {
+            "type": "string",
+            "pattern": "^05_production/prompts/slide_\\d{2,}\\.json$"
+          },
+          "output_image": {
+            "type": "string",
+            "pattern": "^05_production/origin_image/slide_\\d{2,}\\.png$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
+

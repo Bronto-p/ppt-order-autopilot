@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Approved Sample Reference",
+  "type": "object",
+  "required": [
+    "approved_samples",
+    "style_system",
+    "must_match_in_production"
+  ],
+  "properties": {
+    "approved_samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "slide_no",
+          "path",
+          "use_as",
+          "page_family"
+        ],
+        "properties": {
+          "slide_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "use_as": {
+            "enum": [
+              "style_anchor",
+              "cover_reference",
+              "section_reference",
+              "content_page_reference",
+              "data_page_reference",
+              "image_heavy_reference"
+            ]
+          },
+          "page_family": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "style_system": {
+      "type": "object",
+      "required": [
+        "template_master",
+        "style_anchor",
+        "color_behavior",
+        "typography_behavior",
+        "image_treatment"
+      ],
+      "properties": {
+        "template_master": {
+          "type": "string",
+          "minLength": 1
+        },
+        "style_anchor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "navigation_bar": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "color_behavior": {
+          "type": "string",
+          "minLength": 1
+        },
+        "typography_behavior": {
+          "type": "string",
+          "minLength": 1
+        },
+        "image_treatment": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "must_match_in_production": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "palette",
+          "title hierarchy",
+          "navigation geometry",
+          "card radius",
+          "spacing density",
+          "logo placement",
+          "background treatment"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
+
