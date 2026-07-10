@@ -3,7 +3,7 @@ name: ppt-style-master-builder
 description: "PPT 样稿风格包层。把已通过样稿转换成 style_kit 图像锚点、approved_sample_reference.json、style_kit.json 和 locked_elements.json，供正稿每页引用。"
 ---
 
-# PPT Style Master Builder
+# PPT Style Kit Builder
 
 ## Purpose
 

@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "contract_path",
-    "style_master_path",
+    "style_kit_path",
     "slide_jobs_path",
     "slide_run_state_path",
     "assembly_policy"
@@ -13,8 +13,8 @@
     "contract_path": {
       "const": "03_requirements/production_contract.json"
     },
-    "style_master_path": {
-      "const": "04_sample/style_master"
+    "style_kit_path": {
+      "const": "04_sample/style_kit"
     },
     "slide_jobs_path": {
       "const": "05_production/slide_jobs/slide_jobs.json"

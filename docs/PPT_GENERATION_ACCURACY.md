@@ -5,7 +5,7 @@ PPT 生产层的目标不是“能生成一套 PPT”，而是让每一页 subag
 ## Core Rules
 
 1. 每页必须是生图模型生成的完整 16:9 slide image。
-2. 父 agent 不直接做页面，只负责 contract、style master、job packaging、dispatch、QA 和 assembly。
+2. 父 agent 不直接做页面，只负责 contract、style kit、job packaging、dispatch、QA 和 assembly。
 3. 每个 subagent 只做一页。
 4. 每个 subagent 的 job 必须 self-contained。
 5. 每页必须带真实 style/sample/template/nav 参考图，不能只靠文字描述。
@@ -59,6 +59,6 @@ repair / regenerate / assemble
 ## Validator Gates
 
 - `contract_accuracy`: validates production contract depth.
-- `sample_accuracy`: validates style master and approved sample reference.
+- `sample_accuracy`: validates style kit and approved sample reference.
 - `slide_jobs`: validates self-contained one-page jobs.
 - `visual_qa`: validates asset fidelity, style drift, navigation consistency, text readability, and slide run state.
