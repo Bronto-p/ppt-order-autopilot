@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Parent-Owned Slide Finalization",
+  "type": "object",
+  "required": [
+    "job_id",
+    "slide_no",
+    "accepted_attempt",
+    "status",
+    "raw_output_image",
+    "raw_output_sha256",
+    "final_output_image",
+    "final_output_sha256",
+    "locked_chrome",
+    "finalized_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slide_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "accepted_attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "failed"
+      ]
+    },
+    "raw_output_image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_output_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "final_output_image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "final_output_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "locked_chrome": {
+      "type": "object",
+      "required": [
+        "mode",
+        "variant_id",
+        "active_navigation_section",
+        "overlay_path",
+        "overlay_sha256",
+        "applied",
+        "pixel_match",
+        "content_safe_zone_clear"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "post_generation_composite"
+          ]
+        },
+        "variant_id": {
+          "type": ["string", "null"]
+        },
+        "active_navigation_section": {
+          "type": ["string", "null"]
+        },
+        "overlay_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "overlay_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "applied": {
+          "type": "boolean"
+        },
+        "pixel_match": {
+          "type": "boolean"
+        },
+        "content_safe_zone_clear": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "finalized_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

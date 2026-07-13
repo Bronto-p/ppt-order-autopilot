@@ -18,7 +18,7 @@ configs/message_policy.json
 
 Files ending in `.example.json` are never authorization. If live files are missing or still contain replacement values, ask once for the exact WeCom contact identity and intended send permissions. Do not repeatedly ask for values already present in live config. A Codex-attachment order may continue through internal analysis before this setup, but it must stop before any WeCom read or send.
 
-Initialize these runtime files when absent:
+Run `python3 tools/bootstrap_runtime.py`. It initializes these runtime files when absent and never overwrites existing state:
 
 ```text
 ledgers/automation_state.json
@@ -64,9 +64,9 @@ An inquiry ID must be deterministic from contact plus the outbound message ledge
 
 Store pre-order screenshots and downloads here. After a reply reveals the customer topic or a stable fallback title, call `tools/init_order.py --with-templates`, move the staged artifacts into the matching order folders, write a promotion event to both ledgers, and set `active_order_id`.
 
-For `codex_attachment`, use a deterministic inquiry ID derived from the attachment hashes. Copy attachments into `downloads/`, set `source_type=codex_attachment`, record `source_attachment_paths`, and promote once the files or the user's prompt reveal a stable topic. Record the Codex prompt as source evidence; do not fabricate WeCom screenshots, message IDs, or chat coverage. If later delivery must go through WeCom, collect the live contact configuration only at that external-action gate.
+For `codex_attachment`, load `codex-attachment-intake`. It derives a deterministic inquiry ID from the exact prompt plus sorted attachment names/hashes. The source message ID is `codex_prompt_{source_digest[:12]}` and is explicitly a Codex evidence ID, not a fabricated WeCom ID. Copy attachments into `downloads/`, set `source_type=codex_attachment`, record `source_attachment_paths`, and promote once the files or the user's prompt reveal a stable topic. Do not fabricate WeCom screenshots, OCR, senders, or coverage. If later delivery must go through WeCom, collect the live contact configuration only at that external-action gate.
 
-If one reply contains multiple distinct customer orders, create one order per distinct scope and preserve the shared inquiry evidence in each order index.
+If one reply contains multiple distinct customer orders, create one order per distinct scope and preserve the shared inquiry evidence in each order index. Set the first runnable order as `active_order_id` and append the rest to `pending_order_ids`. When the active order reaches an owner gate, move its ID to `waiting_order_ids` before rotating to the next pending order. An owner reply names/binds its order ID, removes it from waiting, and makes it active when safe. Closed orders leave all queues. Never process two orders concurrently under one lock.
 
 ## 4. Orchestration Algorithm
 
@@ -84,11 +84,20 @@ At every wake or resume:
 
 Never rely on the parent chat as the source of truth. Chat is for owner decisions; state and artifacts are for execution.
 
+### Runtime context tiers
+
+1. **Always resident:** automation state, active order state, current state-machine entry, latest relevant events, valid approvals, and compact artifact summaries.
+2. **Stage resident:** exactly one selected skill plus its direct schemas, templates, and input artifacts.
+3. **Worker resident:** one immutable slide bundle only. The slide worker never receives the full repository, raw chat, all customer attachments, or other slide attempts.
+
+The parent retains the production contract, deck story, style kit index, slide run state, and cross-slide QA. It passes the worker only the deck/local summaries and real files already copied into that slide bundle. Paths are pointers, not permission to recursively read unrelated folders.
+
 ## 5. Tool Routing
 
 | Action | Required capability |
 | --- | --- |
 | Open WeCom, locate contact, type, scroll, download, attach, send | Computer Use using `wecom-computer-use-operator` |
+| Stage files attached to the Codex task and promote them into an order | `codex-attachment-intake` |
 | Interpret chat and customer files | Current agent using `wecom-chat-recorder` and `ppt-order-briefing` |
 | Decide next business step | Current agent using `ppt-order-decision` and owner gates |
 | Generate sample/final slides | One subagent per slide with the selected image-generation backend |
@@ -153,4 +162,6 @@ Every final report must name the active inquiry/order, current state, completed 
 
 ## 9. Codex Lifecycle
 
-An active Codex task may continue through all internal steps until it reaches a gate. Repository schedules describe *when* to check WeCom but do not wake Codex by themselves. For reply checks after the active task has ended, use a Codex Automation or explicitly tell the same task to `resume PPT Order Autopilot`. On resume, state and ledgers are authoritative; do not restart the order.
+An active Codex task may continue through all internal steps until it reaches a gate. Repository schedules describe *when* to check WeCom but do not wake Codex by themselves. For reply checks after the active task has ended, use one workspace-level Codex Automation or explicitly tell the same task to `resume PPT Order Autopilot`. On resume, state and ledgers are authoritative; do not restart the order.
+
+When the user asks for unattended monitoring, create/update that one Automation from the live schedule and persist its ID and schedule fingerprint under `automation_binding`. The wake prompt must reconcile external actions, exit quietly when nothing is due, and otherwise continue to an owner gate, blocker, or closeout. Never create one Automation per order.

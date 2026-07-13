@@ -4,7 +4,7 @@
 
 Codex is the orchestrator. The repository supplies durable context, state, safety rules, templates, and validators; it is not trying to replace the Agent with a traditional background service.
 
-Open this repository as the Codex workspace. The root `AGENTS.md` tells Codex how to start and resume without requiring you to prepare folders.
+Install or attach this repository as the `ppt-order-autopilot` Codex plugin, or open it directly as the workspace. The plugin is intentionally thin: it exposes the entrypoint and skills, while progressive disclosure keeps most docs, schemas, raw chat, and customer files out of the active context until needed.
 
 ## One-Time Setup
 
@@ -33,6 +33,8 @@ Continue automatically until an owner gate, a hard blocker, or order closeout.
 ```
 
 Codex stages and indexes the files itself. It must label the source as `codex_attachment`; it must not fabricate a WeCom chat history.
+
+The attachment-intake skill derives stable Codex evidence IDs from the exact prompt and attachment hashes, so rerunning the same task reuses the inquiry instead of duplicating it.
 
 ### Resume
 
@@ -63,10 +65,12 @@ Chat capture, attachment download, OCR, indexing, requirements extraction, confl
 
 Each slide is a separate subagent job. The parent Agent supplies deck-level and local context, keeps all attempts, accepts or rejects the result, runs cross-slide QA, and assembles the final deck.
 
+If navigation, logo, footer, or page numbers must stay fixed, slide workers generate the page body while leaving the locked regions clear. The parent then applies the approved transparent overlay and verifies its hash and pixels before cross-slide QA. This prevents independently generated pages from moving the navigation bar.
+
 ## Waiting And Notifications
 
 Within an active Codex task, the Agent keeps going until a gate or blocker. A schedule stored in this repository does not wake Codex after the task has ended.
 
-For unattended WeCom reply checks, create a Codex Automation that resumes this workspace at the desired interval. If the automation environment cannot control the local WeCom app, keep UI operations in a foreground Codex task and use the automation only to remind or resume you.
+For unattended WeCom reply checks, ask Codex once to create monitoring from the live schedule. The orchestrator maintains one workspace-level Codex Automation and stores its binding, so reruns update it instead of creating duplicates. If the automation environment cannot control the local WeCom app, keep UI operations in a foreground Codex task and use the automation only to remind or resume you.
 
 Owner questions appear in the same Codex task. Operating-system notifications depend on your Codex notification settings.

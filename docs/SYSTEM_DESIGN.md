@@ -112,7 +112,7 @@ owner delivery approval
 
 `ppt-production-core` 是 PPT 生产层。它只接受 slide job bundles，不直接读取企业微信，不自行解释聊天，不自行补需求，不浏览 raw 附件找灵感。
 
-现有的 `full ppt making workflow/skills/ppt-complete-workflow` 可以作为后续生产后端，但接入前必须先由本系统生成干净的生产契约。
+生产后端必须遵循本仓库的 `production_contract.json`、slide bundle、attempt history 和 finalization 契约；不依赖外部参考工作流的隐式约定。
 
 ### QA and Delivery
 

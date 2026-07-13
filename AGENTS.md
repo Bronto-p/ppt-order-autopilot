@@ -4,9 +4,9 @@ This repository is an agent-operated system, not a request for the user to prepa
 
 When the user says to run, continue, resume, check, or operate the PPT order autopilot:
 
-1. Read `docs/AGENT_RUN_LOOP.md` completely.
-2. Read `skills/ppt-business-orchestrator/SKILL.md` and `configs/state_machine.json`.
-3. Inspect live configs, global runtime state, inquiry staging folders, order state, and ledgers.
+1. Read `docs/AGENT_RUN_LOOP.md` and `skills/ppt-business-orchestrator/SKILL.md`.
+2. Inspect the global runtime state, current order state, latest events, approvals, and the current entry in `configs/state_machine.json`.
+3. Inspect raw chats, attachments, or full ledgers only when the selected stage skill requires them.
 4. Resume the earliest unfinished side effect or artifact. Do not restart from chat memory.
 5. Load only the skill and schemas required for the current action.
 6. Continue automatically until an owner-approval gate, a hard blocker, or order closeout.
@@ -19,6 +19,8 @@ Operational rules:
 - Before an order exists, use `inbox/{inquiry_id}/` and `ledgers/automation_state.json`.
 - Once the chat reveals enough identity for an order, initialize `orders/{order_id}_{topic}/`, promote the inquiry artifacts, and continue from order state.
 - Use one subagent per slide. The parent agent owns orchestration, state, packaging, QA, repair decisions, assembly, and reporting.
+- Do not preload all skills, docs, schemas, raw chats, or customer files. Load one stage skill and its direct inputs at a time. A slide worker receives only its immutable slide bundle.
+- If continuous monitoring is requested, maintain one workspace-level Codex Automation and persist its identity in `ledgers/automation_state.json`; never create one automation per order.
 - Every external side effect must be reconciled against ledgers before retrying.
 - At an owner gate, return one decision card containing the order, recommendation, exact message/files affected, consequence, and a short reply instruction. Do not ask vague questions.
 - Never merge pull requests or change `main` without the owner.

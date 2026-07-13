@@ -11,7 +11,7 @@
   ],
   "properties": {
     "event": {
-      "const": "order_created"
+      "enum": ["order_created", "inquiry_promoted"]
     },
     "order_id": {
       "type": "string",
@@ -27,6 +27,9 @@
         "null"
       ]
     },
+    "inquiry_id": {
+      "type": ["string", "null"]
+    },
     "order_path": {
       "type": "string",
       "minLength": 1
@@ -38,4 +41,3 @@
   },
   "additionalProperties": false
 }
-

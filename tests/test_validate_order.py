@@ -7,6 +7,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ORDERS_ROOT = PROJECT_ROOT / "tmp" / "test-suite-orders"
@@ -38,12 +40,12 @@ def sha256_file(path: Path) -> str:
 class ValidateOrderTests(unittest.TestCase):
     def setUp(self) -> None:
         shutil.rmtree(PROJECT_ROOT / "tmp", ignore_errors=True)
-        for name in ["orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
+        for name in ["automation_state.json", "inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
             (PROJECT_ROOT / "ledgers" / name).unlink(missing_ok=True)
 
     def tearDown(self) -> None:
         shutil.rmtree(PROJECT_ROOT / "tmp", ignore_errors=True)
-        for name in ["orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
+        for name in ["automation_state.json", "inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
             (PROJECT_ROOT / "ledgers" / name).unlink(missing_ok=True)
 
     def create_order(self) -> Path:
@@ -208,7 +210,10 @@ class ValidateOrderTests(unittest.TestCase):
                 "must_match": ["color palette", "title hierarchy"],
             },
         )
-        write_json(style_dir / "locked_elements.json", {"canvas": {"width": 1920, "height": 1080}})
+        write_json(
+            style_dir / "locked_elements.json",
+            {"canvas": {"width": 1920, "height": 1080}, "render_strategy": "reference_only"},
+        )
 
     def add_slide_jobs(self, order_dir: Path, reasoning_level: str = "high") -> None:
         bundle_dir = order_dir / "05_production" / "slide_jobs" / "slide_01"
@@ -230,6 +235,7 @@ class ValidateOrderTests(unittest.TestCase):
                         "prompt_file": "05_production/slide_jobs/slide_01/prompt.md",
                         "input_images_dir": "05_production/slide_jobs/slide_01/input_images",
                         "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
+                        "finalization_file": "05_production/slide_jobs/slide_01/finalization.json",
                         "output_image": "05_production/origin_image/slide_01.png",
                     }
                 ],
@@ -265,7 +271,22 @@ class ValidateOrderTests(unittest.TestCase):
                     {"image_id": "template_master", "bundle_path": "input_images/template_master.png", "role": "template_reference", "required": True, "fidelity_rule": "preserve layout system and spacing", "if_missing": "block"},
                     {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
                 ],
-                "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False, "locked_elements": "use style kit rules if provided"},
+                "visual_constraints": {
+                    "must_match_style_anchor": True,
+                    "use_navigation_bar": False,
+                    "locked_elements": "use style kit rules if provided",
+                    "locked_chrome": {
+                        "mode": "none",
+                        "variant_id": None,
+                        "active_navigation_section": None,
+                        "page_number_text": None,
+                        "style_variant_path": None,
+                        "style_variant_sha256": None,
+                        "overlay_bundle_path": None,
+                        "overlay_sha256": None,
+                        "content_safe_box": None,
+                    },
+                },
                 "backend": {
                     "selected_backend": "test-image-backend",
                     "mode": "image_edit",
@@ -293,6 +314,14 @@ class ValidateOrderTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid order_id", result.stdout)
+
+    def test_order_initialization_bootstraps_global_runtime(self) -> None:
+        self.create_order()
+        for name in ["inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
+            self.assertTrue((PROJECT_ROOT / "ledgers" / name).exists(), name)
+        automation_state = json.loads((PROJECT_ROOT / "ledgers" / "automation_state.json").read_text(encoding="utf-8"))
+        self.assertEqual(automation_state["state"], "IDLE")
+        self.assertIn("automation_binding", automation_state)
 
     def test_template_order_passes_base_but_blocks_chat_capture(self) -> None:
         order_dir = self.create_order()
@@ -643,7 +672,10 @@ class ValidateOrderTests(unittest.TestCase):
                 "must_match": ["color palette", "title hierarchy"],
             },
         )
-        write_json(style_dir / "locked_elements.json", {"canvas": {"width": 1920, "height": 1080}})
+        write_json(
+            style_dir / "locked_elements.json",
+            {"canvas": {"width": 1920, "height": 1080}, "render_strategy": "reference_only"},
+        )
 
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -669,7 +701,21 @@ class ValidateOrderTests(unittest.TestCase):
                 {"image_id": "template_master", "bundle_path": "input_images/template_master.png", "role": "template_reference", "required": True, "fidelity_rule": "preserve layout system and spacing", "if_missing": "block"},
                 {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
             ],
-            "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False},
+            "visual_constraints": {
+                "must_match_style_anchor": True,
+                "use_navigation_bar": False,
+                "locked_chrome": {
+                    "mode": "none",
+                    "variant_id": None,
+                    "active_navigation_section": None,
+                    "page_number_text": None,
+                    "style_variant_path": None,
+                    "style_variant_sha256": None,
+                    "overlay_bundle_path": None,
+                    "overlay_sha256": None,
+                    "content_safe_box": None,
+                },
+            },
             "backend": {"selected_backend": "test-image-backend", "mode": "image_edit", "requires_image_inputs": True},
             "qa_requirements": ["exact_content", "text_readability", "style_match"],
             "worker_policy": {"reasoning_level": "high", "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
@@ -688,6 +734,172 @@ class ValidateOrderTests(unittest.TestCase):
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("worker reasoning must be medium/high", result.stdout)
+
+    def test_navigation_requires_locked_chrome_composite(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+        self.add_slide_jobs(order_dir)
+        job_path = order_dir / "05_production" / "slide_jobs" / "slide_01" / "job.json"
+        job = json.loads(job_path.read_text(encoding="utf-8"))
+        job["visual_constraints"]["use_navigation_bar"] = True
+        write_json(job_path, job)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("navigation requires locked chrome composite", result.stdout)
+
+    def test_navigation_locked_chrome_bundle_passes_slide_job_gate(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+        style_dir = order_dir / "04_sample" / "style_kit"
+        skeleton_path = style_dir / "locked_chrome_skeleton.png"
+        style_overlay = style_dir / "locked_chrome_section_test.png"
+        skeleton = Image.new("RGBA", (100, 60), (0, 0, 0, 0))
+        ImageDraw.Draw(skeleton).rectangle((0, 0, 99, 9), fill=(20, 40, 80, 255))
+        skeleton.save(skeleton_path)
+        variant = skeleton.copy()
+        variant_draw = ImageDraw.Draw(variant)
+        variant_draw.rectangle((0, 0, 19, 9), fill=(240, 80, 20, 255))
+        variant_draw.rectangle((90, 0, 99, 9), fill=(0, 0, 0, 255))
+        variant.save(style_overlay)
+        write_json(
+            style_dir / "locked_elements.json",
+            {
+                "canvas": {"width": 100, "height": 60},
+                "render_strategy": "post_generation_composite",
+                "content_safe_box": {"x": 0, "y": 10, "w": 100, "h": 50},
+                "navigation_bar": {"x": 0, "y": 0, "w": 80, "h": 10, "rule": "pixel locked"},
+                "page_number": {"x": 90, "y": 0, "w": 10, "h": 10, "rule": "pixel locked"},
+                "invariant_skeleton": {
+                    "source_path": "04_sample/style_kit/locked_chrome_skeleton.png",
+                    "sha256": sha256_file(skeleton_path),
+                },
+                "dynamic_regions": [
+                    {"region_id": "highlight_test", "role": "active_highlight", "x": 0, "y": 0, "w": 20, "h": 10},
+                    {"region_id": "page_number", "role": "page_number", "x": 90, "y": 0, "w": 10, "h": 10},
+                ],
+                "page_number_policy": {"mode": "plain", "total_slides": None, "custom_values": None},
+                "overlay_variants": [
+                    {
+                        "variant_id": "section_test",
+                        "slide_no": 1,
+                        "page_number_text": "1",
+                        "dynamic_region_ids": ["highlight_test", "page_number"],
+                        "source_path": "04_sample/style_kit/locked_chrome_section_test.png",
+                        "sha256": sha256_file(style_overlay),
+                        "active_navigation_section": "测试",
+                    }
+                ],
+            },
+        )
+        self.add_slide_jobs(order_dir)
+        bundle_dir = order_dir / "05_production" / "slide_jobs" / "slide_01"
+        overlay_path = bundle_dir / "input_images" / "locked_chrome.png"
+        overlay_path.write_bytes(style_overlay.read_bytes())
+        job_path = bundle_dir / "job.json"
+        job = json.loads(job_path.read_text(encoding="utf-8"))
+        job["input_images"].append(
+            {
+                "image_id": "locked_chrome",
+                "bundle_path": "input_images/locked_chrome.png",
+                "role": "locked_chrome_reference",
+                "required": True,
+                "fidelity_rule": "reserve chrome pixels; do not redraw",
+                "sha256": sha256_file(overlay_path),
+                "if_missing": "block",
+            }
+        )
+        job["visual_constraints"]["use_navigation_bar"] = True
+        job["visual_constraints"]["active_navigation_section"] = "测试"
+        job["visual_constraints"]["locked_chrome"] = {
+            "mode": "post_generation_composite",
+            "variant_id": "section_test",
+            "active_navigation_section": "测试",
+            "page_number_text": "1",
+            "style_variant_path": "04_sample/style_kit/locked_chrome_section_test.png",
+            "style_variant_sha256": sha256_file(style_overlay),
+            "overlay_bundle_path": "input_images/locked_chrome.png",
+            "overlay_sha256": sha256_file(overlay_path),
+            "content_safe_box": {"x": 0, "y": 10, "w": 100, "h": 50},
+        }
+        write_json(job_path, job)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_locked_chrome_compositor_preserves_exact_pixels(self) -> None:
+        order_dir = self.create_order()
+        raw_path = order_dir / "05_production" / "slide_jobs" / "slide_01" / "attempts" / "attempt_01" / "output.png"
+        overlay_path = order_dir / "05_production" / "slide_jobs" / "slide_01" / "input_images" / "locked_chrome.png"
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        overlay_path.parent.mkdir(parents=True, exist_ok=True)
+
+        Image.new("RGBA", (100, 60), (25, 40, 60, 255)).save(raw_path)
+        overlay = Image.new("RGBA", (100, 60), (0, 0, 0, 0))
+        ImageDraw.Draw(overlay).rectangle((0, 0, 99, 9), fill=(240, 80, 20, 255))
+        overlay.save(overlay_path)
+        output_rel = "05_production/origin_image/slide_01.png"
+        receipt_rel = "05_production/slide_jobs/slide_01/finalization.json"
+
+        result = run_tool(
+            "tools/composite_locked_chrome.py",
+            "--order-dir",
+            str(order_dir),
+            "--job-id",
+            "test-order:slide_01",
+            "--slide-no",
+            "1",
+            "--accepted-attempt",
+            "1",
+            "--variant-id",
+            "section_test",
+            "--active-navigation-section",
+            "测试",
+            "--raw-image",
+            str(raw_path.relative_to(order_dir)),
+            "--overlay-image",
+            str(overlay_path.relative_to(order_dir)),
+            "--expected-overlay-sha256",
+            sha256_file(overlay_path),
+            "--output-image",
+            output_rel,
+            "--receipt",
+            receipt_rel,
+            "--safe-box",
+            "0",
+            "10",
+            "100",
+            "50",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        final_image = Image.open(order_dir / output_rel).convert("RGBA")
+        self.assertEqual(final_image.getpixel((5, 5)), (240, 80, 20, 255))
+        self.assertEqual(final_image.getpixel((5, 20)), (25, 40, 60, 255))
+        receipt = json.loads((order_dir / receipt_rel).read_text(encoding="utf-8"))
+        self.assertTrue(receipt["locked_chrome"]["pixel_match"])
+        self.assertEqual(receipt["final_output_sha256"], sha256_file(order_dir / output_rel))
+
+        semitransparent = Image.new("RGBA", (100, 60), (0, 0, 0, 0))
+        ImageDraw.Draw(semitransparent).rectangle((0, 0, 99, 9), fill=(240, 80, 20, 128))
+        semitransparent.save(overlay_path)
+        rejected = run_tool(
+            "tools/composite_locked_chrome.py",
+            "--order-dir", str(order_dir),
+            "--job-id", "test-order:slide_01",
+            "--slide-no", "1",
+            "--accepted-attempt", "1",
+            "--variant-id", "section_test",
+            "--raw-image", str(raw_path.relative_to(order_dir)),
+            "--overlay-image", str(overlay_path.relative_to(order_dir)),
+            "--expected-overlay-sha256", sha256_file(overlay_path),
+            "--output-image", output_rel,
+            "--receipt", receipt_rel,
+            "--safe-box", "0", "10", "100", "50",
+        )
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("alpha must be binary", rejected.stdout)
 
     def test_slide_jobs_require_deck_and_local_context(self) -> None:
         order_dir = self.prepare_order_through_production()
@@ -711,7 +923,10 @@ class ValidateOrderTests(unittest.TestCase):
         self.add_style_kit(order_dir)
         self.add_slide_jobs(order_dir)
         (order_dir / "05_production" / "origin_image").mkdir(parents=True, exist_ok=True)
-        (order_dir / "05_production" / "origin_image" / "slide_01.png").write_bytes(b"fake-output")
+        (order_dir / "05_production" / "origin_image" / "slide_01.png").write_bytes(b"fake-final-output")
+        raw_output = order_dir / "05_production" / "slide_jobs" / "slide_01" / "attempts" / "attempt_01" / "output.png"
+        raw_output.parent.mkdir(parents=True, exist_ok=True)
+        raw_output.write_bytes(b"fake-raw-output")
         write_json(
             order_dir / "05_production" / "slide_jobs" / "slide_01" / "render_result.json",
             {
@@ -719,12 +934,36 @@ class ValidateOrderTests(unittest.TestCase):
                 "attempt": 1,
                 "slide_no": 1,
                 "status": "success",
-                "output_image": "05_production/origin_image/slide_01.png",
+                "output_image": "05_production/slide_jobs/slide_01/attempts/attempt_01/output.png",
                 "input_images_seen": ["style_anchor.png"],
                 "asset_fidelity": [],
                 "style_match": "pass",
                 "text_readability": "pass",
                 "blockers": [],
+            },
+        )
+        write_json(
+            order_dir / "05_production" / "slide_jobs" / "slide_01" / "finalization.json",
+            {
+                "job_id": "test-order:slide_01",
+                "slide_no": 1,
+                "accepted_attempt": 1,
+                "status": "pass",
+                "raw_output_image": "05_production/slide_jobs/slide_01/attempts/attempt_01/output.png",
+                "raw_output_sha256": sha256_file(raw_output),
+                "final_output_image": "05_production/origin_image/slide_01.png",
+                "final_output_sha256": sha256_file(order_dir / "05_production" / "origin_image" / "slide_01.png"),
+                "locked_chrome": {
+                    "mode": "none",
+                    "variant_id": None,
+                    "active_navigation_section": None,
+                    "overlay_path": None,
+                    "overlay_sha256": None,
+                    "applied": False,
+                    "pixel_match": True,
+                    "content_safe_zone_clear": True,
+                },
+                "finalized_at": "2026-07-06T10:30:00+08:00",
             },
         )
         write_json(
@@ -738,6 +977,7 @@ class ValidateOrderTests(unittest.TestCase):
                         "bundle_dir": "05_production/slide_jobs/slide_01",
                         "job_file": "05_production/slide_jobs/slide_01/job.json",
                         "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
+                        "finalization_file": "05_production/slide_jobs/slide_01/finalization.json",
                         "status": "accepted",
                         "current_attempt": 1,
                         "max_attempts": 3,
@@ -748,12 +988,13 @@ class ValidateOrderTests(unittest.TestCase):
                                 "status": "accepted",
                                 "job_snapshot_file": "05_production/slide_jobs/slide_01/job.json",
                                 "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
-                                "output_image": "05_production/origin_image/slide_01.png",
+                                "output_image": "05_production/slide_jobs/slide_01/attempts/attempt_01/output.png",
                                 "failure_class": "none",
                                 "repair_instructions": None,
                             }
                         ],
                         "selected_source": "05_production/origin_image/slide_01.png",
+                        "final_output_image": "05_production/origin_image/slide_01.png",
                         "backend_used": "same_as_sample",
                         "input_images_seen": ["style_anchor.png"],
                         "asset_fidelity_check": "ok",

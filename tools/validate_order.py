@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+from PIL import Image, ImageChops, ImageDraw
+
 
 ALLOWED_REQUIREMENT_CONFIDENCE = {"high", "medium", "low", "inferred", "missing"}
 ALLOWED_ATTACHMENT_STATUS = {"success", "failed", "skipped"}
@@ -203,6 +205,11 @@ def check_state_machine(order_dir: Path, result: ValidationResult, state: dict[s
     result.require(current_state in states, f"state.json state is not in state machine: {current_state}")
 
     previous_state = state.get("previous_state")
+    result.require("previous_state" in state, "state.json previous_state is required")
+    if current_state == machine.get("initial_state"):
+        result.require(previous_state is None or previous_state == current_state, "initial state previous_state must be null or itself")
+    else:
+        result.require(isinstance(previous_state, str) and previous_state in states, "non-initial state requires a valid previous_state")
     if isinstance(previous_state, str) and previous_state in states:
         allowed_next = states.get(previous_state, {}).get("allowed_next", [])
         result.require(
@@ -574,6 +581,182 @@ def is_sample_required(order_dir: Path, result: ValidationResult) -> bool:
     return False
 
 
+def check_locked_elements(order_dir: Path, result: ValidationResult, locked: dict[str, Any] | None) -> None:
+    if not locked:
+        return
+    canvas = locked.get("canvas")
+    result.require(isinstance(canvas, dict), "locked_elements.json canvas must be an object")
+    if isinstance(canvas, dict):
+        result.require(isinstance(canvas.get("width"), int) and canvas["width"] > 0, "locked canvas width must be positive")
+        result.require(isinstance(canvas.get("height"), int) and canvas["height"] > 0, "locked canvas height must be positive")
+
+    strategy = locked.get("render_strategy")
+    result.require(strategy in {"reference_only", "post_generation_composite"}, "locked render_strategy is invalid")
+    fixed_elements = any(locked.get(name) is not None for name in ["logo", "navigation_bar", "footer", "page_number"])
+    if fixed_elements:
+        result.require(strategy == "post_generation_composite", "fixed chrome requires post_generation_composite")
+    if strategy != "post_generation_composite":
+        return
+
+    safe_box = locked.get("content_safe_box")
+    result.require(isinstance(safe_box, dict), "locked chrome requires content_safe_box")
+    if isinstance(safe_box, dict) and isinstance(canvas, dict):
+        values = [safe_box.get(name) for name in ["x", "y", "w", "h"]]
+        result.require(all(isinstance(value, int) for value in values), "locked chrome content_safe_box must use integer coordinates")
+        if all(isinstance(value, int) for value in values):
+            x, y, width, height = values
+            result.require(width > 0 and height > 0, "locked chrome content_safe_box must have positive size")
+            result.require(x >= 0 and y >= 0, "locked chrome content_safe_box cannot use negative coordinates")
+            if isinstance(canvas.get("width"), int) and isinstance(canvas.get("height"), int):
+                result.require(x + width <= canvas["width"] and y + height <= canvas["height"], "locked chrome content_safe_box exceeds canvas")
+    variants = locked.get("overlay_variants")
+    result.require(isinstance(variants, list) and bool(variants), "locked chrome requires overlay_variants")
+    skeleton = locked.get("invariant_skeleton")
+    result.require(isinstance(skeleton, dict), "locked chrome requires invariant_skeleton")
+    skeleton_path = None
+    if isinstance(skeleton, dict):
+        skeleton_rel = skeleton.get("source_path")
+        result.require(isinstance(skeleton_rel, str) and skeleton_rel.startswith("04_sample/style_kit/"), "locked chrome skeleton must stay in style_kit")
+        skeleton_path = safe_runtime_path(order_dir, skeleton_rel, result, "locked chrome skeleton source_path")
+        skeleton_sha = skeleton.get("sha256")
+        result.require(isinstance(skeleton_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", skeleton_sha), "locked chrome skeleton sha256 is invalid")
+        if skeleton_path is not None:
+            result.require(skeleton_path.exists(), "locked chrome skeleton does not exist")
+            if skeleton_path.exists() and isinstance(skeleton_sha, str):
+                result.require(sha256_file(skeleton_path) == skeleton_sha, "locked chrome skeleton sha256 mismatch")
+
+    dynamic_regions = locked.get("dynamic_regions")
+    result.require(isinstance(dynamic_regions, list) and bool(dynamic_regions), "locked chrome requires dynamic_regions")
+    region_boxes: dict[str, tuple[str, int, int, int, int]] = {}
+    if isinstance(dynamic_regions, list) and isinstance(canvas, dict):
+        for index, box in enumerate(dynamic_regions, start=1):
+            values = [box.get(name) for name in ["x", "y", "w", "h"]] if isinstance(box, dict) else []
+            region_id = box.get("region_id") if isinstance(box, dict) else None
+            region_role = box.get("role") if isinstance(box, dict) else None
+            result.require(isinstance(region_id, str) and bool(region_id), f"locked dynamic region {index} region_id is invalid")
+            if isinstance(region_id, str):
+                result.require(region_id not in region_boxes, f"locked dynamic region_id is duplicated: {region_id}")
+            result.require(region_role in {"active_highlight", "page_number"}, f"locked dynamic region {index} role is invalid")
+            result.require(len(values) == 4 and all(isinstance(value, int) for value in values), f"locked dynamic region {index} is invalid")
+            if len(values) == 4 and all(isinstance(value, int) for value in values):
+                x, y, width, height = values
+                result.require(x >= 0 and y >= 0 and width > 0 and height > 0, f"locked dynamic region {index} has invalid geometry")
+                if isinstance(canvas.get("width"), int) and isinstance(canvas.get("height"), int):
+                    result.require(x + width <= canvas["width"] and y + height <= canvas["height"], f"locked dynamic region {index} exceeds canvas")
+                target_box = locked.get("navigation_bar" if region_role == "active_highlight" else "page_number")
+                result.require(isinstance(target_box, dict), f"locked dynamic region {index} has no matching locked element")
+                if isinstance(target_box, dict):
+                    tx, ty, tw, th = (target_box.get(name) for name in ["x", "y", "w", "h"])
+                    if all(isinstance(value, int) for value in [tx, ty, tw, th]):
+                        result.require(x >= tx and y >= ty and x + width <= tx + tw and y + height <= ty + th, f"locked dynamic region {index} escapes its locked element")
+                        if region_role == "active_highlight" and tw * th > 1:
+                            result.require(width * height < tw * th, f"locked dynamic region {index} cannot cover the entire navigation bar")
+                if isinstance(region_id, str) and region_role in {"active_highlight", "page_number"}:
+                    region_boxes[region_id] = (region_role, x, y, width, height)
+
+    page_policy = locked.get("page_number_policy")
+    result.require(isinstance(page_policy, dict), "locked chrome requires page_number_policy")
+    policy_mode = page_policy.get("mode") if isinstance(page_policy, dict) else None
+    result.require(policy_mode in {"none", "plain", "zero_padded_2", "current_over_total", "custom"}, "locked page number policy is invalid")
+    if locked.get("page_number") is not None:
+        result.require(policy_mode != "none", "locked page number requires a numbering policy")
+    contract = load_production_contract(order_dir, result)
+    deck_page_count = contract.get("deck", {}).get("page_count") if isinstance(contract, dict) else None
+    if policy_mode == "current_over_total":
+        result.require(isinstance(page_policy.get("total_slides"), int), "current_over_total page policy requires total_slides")
+        if isinstance(deck_page_count, int):
+            result.require(page_policy.get("total_slides") == deck_page_count, "page number total_slides must match production contract")
+    if policy_mode == "custom":
+        result.require(isinstance(page_policy.get("custom_values"), dict) and bool(page_policy.get("custom_values")), "custom page policy requires custom_values")
+
+    skeleton_image = None
+    if skeleton_path is not None and skeleton_path.exists():
+        try:
+            skeleton_image = Image.open(skeleton_path).convert("RGBA")
+        except OSError:
+            result.errors.append("locked chrome skeleton is not a readable image")
+    if not isinstance(variants, list):
+        return
+    seen_variant_ids: set[str] = set()
+    seen_variant_slides: set[int] = set()
+    for index, variant in enumerate(variants, start=1):
+        result.require(isinstance(variant, dict), f"locked overlay variant {index} must be an object")
+        if not isinstance(variant, dict):
+            continue
+        variant_id = variant.get("variant_id")
+        result.require(isinstance(variant_id, str) and bool(variant_id), f"locked overlay variant {index} variant_id is invalid")
+        if isinstance(variant_id, str):
+            result.require(variant_id not in seen_variant_ids, f"locked overlay variant_id is duplicated: {variant_id}")
+            seen_variant_ids.add(variant_id)
+        variant_slide = variant.get("slide_no")
+        result.require(isinstance(variant_slide, int) and variant_slide > 0, f"locked overlay variant {index} slide_no is invalid")
+        if isinstance(variant_slide, int):
+            result.require(variant_slide not in seen_variant_slides, f"locked overlay slide_no is duplicated: {variant_slide}")
+            seen_variant_slides.add(variant_slide)
+        page_number_text = variant.get("page_number_text")
+        selected_region_ids = variant.get("dynamic_region_ids")
+        result.require(isinstance(selected_region_ids, list) and bool(selected_region_ids), f"locked overlay variant {index} dynamic_region_ids is empty")
+        selected_regions = [region_boxes.get(region_id) for region_id in selected_region_ids or [] if isinstance(region_id, str)]
+        result.require(all(region is not None for region in selected_regions), f"locked overlay variant {index} references an unknown dynamic region")
+        selected_roles = {region[0] for region in selected_regions if region is not None}
+        if locked.get("navigation_bar") is not None:
+            result.require("active_highlight" in selected_roles, f"locked overlay variant {index} lacks an active highlight region")
+        if locked.get("page_number") is not None:
+            result.require("page_number" in selected_roles, f"locked overlay variant {index} lacks a page number region")
+            result.require(not is_empty_value(page_number_text), f"locked overlay variant {index} page_number_text is required")
+        expected_page_number = None
+        if isinstance(variant_slide, int) and isinstance(page_policy, dict):
+            if policy_mode == "plain":
+                expected_page_number = str(variant_slide)
+            elif policy_mode == "zero_padded_2":
+                expected_page_number = f"{variant_slide:02d}"
+            elif policy_mode == "current_over_total" and isinstance(page_policy.get("total_slides"), int):
+                expected_page_number = f"{variant_slide}/{page_policy['total_slides']}"
+            elif policy_mode == "custom" and isinstance(page_policy.get("custom_values"), dict):
+                expected_page_number = page_policy["custom_values"].get(str(variant_slide))
+        result.require(page_number_text == expected_page_number, f"locked overlay variant {index} page_number_text violates policy")
+        source_rel = variant.get("source_path")
+        result.require(isinstance(source_rel, str) and source_rel.startswith("04_sample/style_kit/"), f"locked overlay variant {index} must stay in style_kit")
+        source_path = safe_runtime_path(
+            order_dir,
+            source_rel,
+            result,
+            f"locked overlay variant {index} source_path",
+        )
+        expected_sha = variant.get("sha256")
+        result.require(
+            isinstance(expected_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_sha),
+            f"locked overlay variant {index} sha256 is invalid",
+        )
+        if source_path is not None:
+            result.require(source_path.exists(), f"locked overlay variant {index} source does not exist")
+            if source_path.exists() and isinstance(expected_sha, str):
+                result.require(sha256_file(source_path) == expected_sha, f"locked overlay variant {index} sha256 mismatch")
+            if source_path.exists() and skeleton_image is not None:
+                try:
+                    variant_image = Image.open(source_path).convert("RGBA")
+                    result.require(variant_image.size == skeleton_image.size, f"locked overlay variant {index} canvas differs from skeleton")
+                    alpha_histogram = variant_image.getchannel("A").histogram()
+                    result.require(sum(alpha_histogram[1:255]) == 0, f"locked overlay variant {index} alpha must be binary")
+                    if variant_image.size == skeleton_image.size:
+                        invariant_mask = Image.new("L", variant_image.size, 255)
+                        mask_draw = ImageDraw.Draw(invariant_mask)
+                        for _, x, y, width, height in [region for region in selected_regions if region is not None]:
+                            mask_draw.rectangle((x, y, x + width - 1, y + height - 1), fill=0)
+                        rgb_difference = ImageChops.difference(variant_image.convert("RGB"), skeleton_image.convert("RGB"))
+                        invariant_rgb_difference = Image.new("RGB", variant_image.size, (0, 0, 0))
+                        invariant_rgb_difference.paste(rgb_difference, mask=invariant_mask)
+                        alpha_difference = ImageChops.difference(variant_image.getchannel("A"), skeleton_image.getchannel("A"))
+                        invariant_alpha_difference = Image.new("L", variant_image.size, 0)
+                        invariant_alpha_difference.paste(alpha_difference, mask=invariant_mask)
+                        result.require(
+                            invariant_rgb_difference.getbbox() is None and invariant_alpha_difference.getbbox() is None,
+                            f"locked overlay variant {index} changes invariant skeleton pixels",
+                        )
+                except OSError:
+                    result.errors.append(f"locked overlay variant {index} is not a readable image")
+
+
 def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
     check_contract_accuracy(order_dir, result)
     sample_dir = order_dir / "04_sample"
@@ -639,7 +822,8 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
         "locked_elements.json",
     ]:
         result.require((style_kit / rel_path).exists(), f"missing style kit artifact: 04_sample/style_kit/{rel_path}")
-    load_json(style_kit / "locked_elements.json", result, "04_sample/style_kit/locked_elements.json")
+    locked = load_json(style_kit / "locked_elements.json", result, "04_sample/style_kit/locked_elements.json")
+    check_locked_elements(order_dir, result, locked)
 
 
 def check_customer_sample_decision(
@@ -692,6 +876,7 @@ def check_slide_job_payload(
     result.require(isinstance(job.get("local_context"), dict) and bool(job.get("local_context")), f"{rel_label} local_context must be a non-empty object")
     check_exact_content(rel_label, job.get("exact_content"), result)
     result.require(isinstance(job.get("visual_constraints"), dict) and bool(job.get("visual_constraints")), f"{rel_label} visual_constraints must be a non-empty object")
+    visual_constraints = job.get("visual_constraints")
     input_images = job.get("input_images")
     result.require(isinstance(input_images, list) and bool(input_images), f"{rel_label} input_images must not be empty")
     roles = {image.get("role") for image in input_images if isinstance(input_images, list) and isinstance(image, dict)}
@@ -724,6 +909,71 @@ def check_slide_job_payload(
                     result.require(sha256_file(image_path) == expected_sha, f"{rel_label} input image {image_index} sha256 mismatch")
             if image.get("required") is True:
                 result.require(not is_empty_value(image.get("fidelity_rule")), f"{rel_label} required input image {image_index} missing fidelity_rule")
+    if isinstance(visual_constraints, dict):
+        locked_chrome = visual_constraints.get("locked_chrome")
+        result.require(isinstance(locked_chrome, dict), f"{rel_label} locked_chrome must be an object")
+        if isinstance(locked_chrome, dict):
+            chrome_mode = locked_chrome.get("mode")
+            result.require(chrome_mode in {"none", "post_generation_composite"}, f"{rel_label} locked_chrome mode is invalid")
+            if visual_constraints.get("use_navigation_bar") is True:
+                result.require(chrome_mode == "post_generation_composite", f"{rel_label} navigation requires locked chrome composite")
+            if chrome_mode == "post_generation_composite":
+                variant_id = locked_chrome.get("variant_id")
+                result.require(isinstance(variant_id, str) and bool(variant_id), f"{rel_label} locked chrome variant_id is required")
+                if visual_constraints.get("use_navigation_bar") is True:
+                    result.require(not is_empty_value(locked_chrome.get("active_navigation_section")), f"{rel_label} navigation active section is required")
+                    result.require(
+                        locked_chrome.get("active_navigation_section") == visual_constraints.get("active_navigation_section"),
+                        f"{rel_label} active navigation section sources disagree",
+                    )
+                locked_registry = load_json(
+                    order_dir / "04_sample" / "style_kit" / "locked_elements.json",
+                    result,
+                    "04_sample/style_kit/locked_elements.json",
+                )
+                registry_variants = locked_registry.get("overlay_variants", []) if isinstance(locked_registry, dict) else []
+                matching_variants = [
+                    variant
+                    for variant in registry_variants
+                    if isinstance(variant, dict) and variant.get("variant_id") == variant_id
+                ]
+                result.require(len(matching_variants) == 1, f"{rel_label} locked chrome variant is not uniquely registered in style kit")
+                registered_variant = matching_variants[0] if len(matching_variants) == 1 else None
+                if isinstance(registered_variant, dict):
+                    result.require(registered_variant.get("slide_no") == expected_slide_no, f"{rel_label} locked chrome variant belongs to another slide")
+                    result.require(registered_variant.get("active_navigation_section") == locked_chrome.get("active_navigation_section"), f"{rel_label} locked chrome active section differs from style kit")
+                    result.require(registered_variant.get("page_number_text") == locked_chrome.get("page_number_text"), f"{rel_label} locked chrome page number differs from style kit")
+                    result.require(registered_variant.get("source_path") == locked_chrome.get("style_variant_path"), f"{rel_label} locked chrome style source path mismatch")
+                    result.require(registered_variant.get("sha256") == locked_chrome.get("style_variant_sha256"), f"{rel_label} locked chrome style source sha256 mismatch")
+                    result.require(registered_variant.get("sha256") == locked_chrome.get("overlay_sha256"), f"{rel_label} bundled overlay differs from approved style variant")
+                    result.require(locked_registry.get("content_safe_box") == locked_chrome.get("content_safe_box"), f"{rel_label} locked chrome safe box differs from style kit")
+                overlay_bundle_path = locked_chrome.get("overlay_bundle_path")
+                overlay_path = safe_runtime_path(
+                    bundle_dir,
+                    overlay_bundle_path,
+                    result,
+                    f"{rel_label} locked chrome overlay",
+                )
+                expected_sha = locked_chrome.get("overlay_sha256")
+                result.require(
+                    isinstance(expected_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_sha),
+                    f"{rel_label} locked chrome sha256 is invalid",
+                )
+                if overlay_path is not None:
+                    result.require(overlay_path.exists(), f"{rel_label} locked chrome overlay is missing")
+                    if overlay_path.exists() and isinstance(expected_sha, str):
+                        result.require(sha256_file(overlay_path) == expected_sha, f"{rel_label} locked chrome sha256 mismatch")
+                safe_box = locked_chrome.get("content_safe_box")
+                result.require(isinstance(safe_box, dict), f"{rel_label} locked chrome content_safe_box is required")
+                matching_inputs = [
+                    image
+                    for image in input_images or []
+                    if isinstance(image, dict)
+                    and image.get("bundle_path") == overlay_bundle_path
+                    and image.get("role") == "locked_chrome_reference"
+                    and image.get("required") is True
+                ]
+                result.require(bool(matching_inputs), f"{rel_label} locked chrome must be a required input image")
     worker = job.get("worker_policy")
     if isinstance(worker, dict):
         result.require(worker.get("reasoning_level") in ALLOWED_WORKER_REASONING, f"{rel_label} worker reasoning must be medium/high")
@@ -752,6 +1002,8 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
     if not isinstance(jobs, list):
         return
     seen_job_ids: set[str] = set()
+    seen_slide_nos: set[int] = set()
+    seen_output_images: set[str] = set()
     for index, job_record in enumerate(jobs, start=1):
         result.require(isinstance(job_record, dict), f"slide_jobs.json record {index} must be an object")
         if not isinstance(job_record, dict):
@@ -762,21 +1014,34 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
         job_file = job_record.get("job_file")
         prompt_file = job_record.get("prompt_file")
         input_images_dir = job_record.get("input_images_dir")
+        finalization_file = job_record.get("finalization_file")
         output_image = job_record.get("output_image")
         result.require(isinstance(job_id, str) and bool(job_id), f"slide_jobs.json record {index} missing job_id")
         if isinstance(job_id, str):
             result.require(job_id not in seen_job_ids, f"duplicate slide job_id: {job_id}")
             seen_job_ids.add(job_id)
         result.require(isinstance(slide_no, int), f"slide_jobs.json record {index} missing slide_no")
+        if isinstance(slide_no, int):
+            result.require(slide_no not in seen_slide_nos, f"duplicate slide_no: {slide_no}")
+            seen_slide_nos.add(slide_no)
         result.require(isinstance(bundle_dir, str) and bundle_dir.startswith("05_production/slide_jobs/slide_"), f"slide_jobs.json record {index} invalid bundle_dir")
         result.require(isinstance(job_file, str) and job_file.endswith("/job.json"), f"slide_jobs.json record {index} invalid job_file")
         result.require(isinstance(prompt_file, str) and prompt_file.endswith("/prompt.md"), f"slide_jobs.json record {index} invalid prompt_file")
         result.require(isinstance(input_images_dir, str) and input_images_dir.endswith("/input_images"), f"slide_jobs.json record {index} invalid input_images_dir")
+        result.require(isinstance(finalization_file, str) and finalization_file.endswith("/finalization.json"), f"slide_jobs.json record {index} invalid finalization_file")
         result.require(isinstance(output_image, str) and output_image.startswith("05_production/origin_image/"), f"slide_jobs.json record {index} invalid output_image")
+        if isinstance(output_image, str):
+            result.require(output_image not in seen_output_images, f"duplicate canonical output_image: {output_image}")
+            seen_output_images.add(output_image)
+        if isinstance(slide_no, int):
+            expected_prefix = f"05_production/slide_jobs/slide_{slide_no:02d}"
+            result.require(bundle_dir == expected_prefix, f"slide_jobs.json record {index} bundle_dir does not match slide_no")
+            result.require(output_image == f"05_production/origin_image/slide_{slide_no:02d}.png", f"slide_jobs.json record {index} output_image does not match slide_no")
         prompt_path = safe_runtime_path(order_dir, prompt_file, result, f"slide_jobs.json record {index} prompt_file")
         input_path = safe_runtime_path(order_dir, input_images_dir, result, f"slide_jobs.json record {index} input_images_dir")
         job_path = safe_runtime_path(order_dir, job_file, result, f"slide_jobs.json record {index} job_file")
         bundle_path = safe_runtime_path(order_dir, bundle_dir, result, f"slide_jobs.json record {index} bundle_dir")
+        safe_runtime_path(order_dir, finalization_file, result, f"slide_jobs.json record {index} finalization_file")
         safe_runtime_path(order_dir, output_image, result, f"slide_jobs.json record {index} output_image")
         if prompt_path is not None:
             result.require(exists_nonempty(prompt_path), f"slide_jobs.json record {index} missing prompt_file")
@@ -833,6 +1098,12 @@ def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
     result.require(isinstance(slides, list) and bool(slides), "slide_run_state.json slides must not be empty")
     if not isinstance(slides, list):
         return
+    jobs_payload = load_slide_jobs(order_dir, result)
+    jobs_by_id = {
+        job.get("job_id"): job
+        for job in (jobs_payload or {}).get("jobs", [])
+        if isinstance(job, dict) and isinstance(job.get("job_id"), str)
+    }
     for index, slide in enumerate(slides, start=1):
         result.require(isinstance(slide, dict), f"slide_run_state slide {index} must be an object")
         if not isinstance(slide, dict):
@@ -851,8 +1122,17 @@ def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
         check_slide_attempt_history(slide, index, result, current_attempt, max_attempts, accepted_attempt)
         result.require(not slide.get("blockers"), f"slide_run_state slide {index} has blockers")
         result.require(not is_empty_value(slide.get("render_result_file")), f"slide_run_state slide {index} missing render_result_file")
+        result.require(not is_empty_value(slide.get("finalization_file")), f"slide_run_state slide {index} missing finalization_file")
         result.require(not is_empty_value(slide.get("selected_source")), f"slide_run_state slide {index} missing selected_source")
+        result.require(not is_empty_value(slide.get("final_output_image")), f"slide_run_state slide {index} missing final_output_image")
         result.require(is_nonempty_collection(slide.get("input_images_seen")), f"slide_run_state slide {index} missing input_images_seen")
+        job_record = jobs_by_id.get(slide.get("job_id"))
+        result.require(isinstance(job_record, dict), f"slide_run_state slide {index} job_id is not in slide_jobs.json")
+        if isinstance(job_record, dict):
+            result.require(slide.get("render_result_file") == job_record.get("render_result_file"), f"slide_run_state slide {index} render_result_file mismatch")
+            result.require(slide.get("finalization_file") == job_record.get("finalization_file"), f"slide_run_state slide {index} finalization_file mismatch")
+            result.require(slide.get("final_output_image") == job_record.get("output_image"), f"slide_run_state slide {index} final_output_image mismatch")
+            result.require(slide.get("selected_source") == job_record.get("output_image"), f"slide_run_state slide {index} selected_source must be canonical final output")
 
 
 def check_render_results(order_dir: Path, result: ValidationResult) -> None:
@@ -883,9 +1163,18 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         result.require(render.get("slide_no") == slide_no, f"{result_file} slide_no mismatch")
         result.require(render.get("status") == "success", f"{result_file} status must be success")
         result.require(not render.get("blockers"), f"{result_file} blockers must be empty")
-        output_path = safe_runtime_path(order_dir, output_image, result, f"slide {slide_no} output_image")
-        result.require(output_path is not None and output_path.exists(), f"slide {slide_no} output image missing")
-        result.require(render.get("output_image") == output_image, f"{result_file} output_image must match slide_jobs.json")
+        raw_output = render.get("output_image")
+        attempt = render.get("attempt")
+        bundle_dir = job_record.get("bundle_dir")
+        expected_raw_output = (
+            f"{bundle_dir}/attempts/attempt_{attempt:02d}/output.png"
+            if isinstance(bundle_dir, str) and isinstance(attempt, int)
+            else None
+        )
+        result.require(raw_output == expected_raw_output, f"{result_file} output_image must stay in its own attempt directory")
+        output_path = safe_runtime_path(order_dir, raw_output, result, f"slide {slide_no} raw output_image")
+        result.require(output_path is not None and output_path.exists(), f"slide {slide_no} raw output image missing")
+        result.require(raw_output != output_image, f"{result_file} must preserve raw output separately from final output")
         result.require(is_nonempty_collection(render.get("input_images_seen")), f"{result_file} input_images_seen must not be empty")
         for fidelity in render.get("asset_fidelity", []):
             if not isinstance(fidelity, dict):
@@ -896,10 +1185,89 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         result.require(render.get("text_readability") == "pass", f"{result_file} text_readability must pass")
 
 
+def check_finalizations(order_dir: Path, result: ValidationResult) -> None:
+    jobs_payload = load_slide_jobs(order_dir, result)
+    if not jobs_payload:
+        return
+    jobs = jobs_payload.get("jobs")
+    if not isinstance(jobs, list):
+        return
+    run_state = load_json(order_dir / "05_production" / "slide_run_state.json", result, "05_production/slide_run_state.json")
+    run_slides_by_job = {
+        slide.get("job_id"): slide
+        for slide in (run_state or {}).get("slides", [])
+        if isinstance(slide, dict) and isinstance(slide.get("job_id"), str)
+    }
+    for index, job_record in enumerate(jobs, start=1):
+        if not isinstance(job_record, dict):
+            continue
+        slide_no = job_record.get("slide_no", index)
+        job_id = job_record.get("job_id")
+        bundle_dir = job_record.get("bundle_dir")
+        job_file = safe_runtime_path(order_dir, job_record.get("job_file"), result, f"slide {slide_no} job_file")
+        render_file = safe_runtime_path(order_dir, job_record.get("render_result_file"), result, f"slide {slide_no} render_result_file")
+        finalization_path = safe_runtime_path(order_dir, job_record.get("finalization_file"), result, f"slide {slide_no} finalization_file")
+        if job_file is None or render_file is None or finalization_path is None:
+            continue
+        job = load_json(job_file, result, str(job_record.get("job_file")))
+        render = load_json(render_file, result, str(job_record.get("render_result_file")))
+        finalization = load_json(finalization_path, result, str(job_record.get("finalization_file")))
+        if not job or not render or not finalization:
+            continue
+        result.require(finalization.get("job_id") == job_id, f"slide {slide_no} finalization job_id mismatch")
+        result.require(finalization.get("slide_no") == slide_no, f"slide {slide_no} finalization slide_no mismatch")
+        result.require(finalization.get("accepted_attempt") == render.get("attempt"), f"slide {slide_no} finalization attempt mismatch")
+        run_slide = run_slides_by_job.get(job_id)
+        result.require(isinstance(run_slide, dict), f"slide {slide_no} finalization has no slide_run_state record")
+        if isinstance(run_slide, dict):
+            result.require(finalization.get("accepted_attempt") == run_slide.get("accepted_attempt"), f"slide {slide_no} finalization does not match accepted attempt")
+            accepted_records = [
+                attempt
+                for attempt in run_slide.get("attempts", [])
+                if isinstance(attempt, dict) and attempt.get("attempt") == run_slide.get("accepted_attempt")
+            ]
+            result.require(len(accepted_records) == 1, f"slide {slide_no} accepted attempt record is not unique")
+            if len(accepted_records) == 1:
+                result.require(accepted_records[0].get("output_image") == render.get("output_image"), f"slide {slide_no} accepted attempt output differs from render result")
+        result.require(finalization.get("status") == "pass", f"slide {slide_no} finalization must pass")
+        result.require(finalization.get("raw_output_image") == render.get("output_image"), f"slide {slide_no} finalization raw output mismatch")
+        raw_output_path = safe_runtime_path(order_dir, render.get("output_image"), result, f"slide {slide_no} finalized raw output")
+        if raw_output_path is not None and raw_output_path.exists():
+            result.require(finalization.get("raw_output_sha256") == sha256_file(raw_output_path), f"slide {slide_no} raw output sha256 mismatch")
+        final_output = finalization.get("final_output_image")
+        result.require(final_output == job_record.get("output_image"), f"slide {slide_no} final output must match slide_jobs.json")
+        final_output_path = safe_runtime_path(order_dir, final_output, result, f"slide {slide_no} final output")
+        result.require(final_output_path is not None and final_output_path.exists(), f"slide {slide_no} final output image missing")
+        if final_output_path is not None and final_output_path.exists():
+            result.require(finalization.get("final_output_sha256") == sha256_file(final_output_path), f"slide {slide_no} final output sha256 mismatch")
+
+        locked_chrome = job.get("visual_constraints", {}).get("locked_chrome")
+        finalized_chrome = finalization.get("locked_chrome")
+        result.require(isinstance(locked_chrome, dict), f"slide {slide_no} job locked_chrome is invalid")
+        result.require(isinstance(finalized_chrome, dict), f"slide {slide_no} finalization locked_chrome is invalid")
+        if not isinstance(locked_chrome, dict) or not isinstance(finalized_chrome, dict):
+            continue
+        chrome_mode = locked_chrome.get("mode")
+        result.require(finalized_chrome.get("mode") == chrome_mode, f"slide {slide_no} locked chrome mode mismatch")
+        if chrome_mode == "post_generation_composite":
+            expected_overlay = f"{bundle_dir}/{locked_chrome.get('overlay_bundle_path')}"
+            result.require(finalized_chrome.get("variant_id") == locked_chrome.get("variant_id"), f"slide {slide_no} locked chrome variant mismatch")
+            result.require(finalized_chrome.get("active_navigation_section") == locked_chrome.get("active_navigation_section"), f"slide {slide_no} active navigation section mismatch")
+            result.require(finalized_chrome.get("overlay_path") == expected_overlay, f"slide {slide_no} locked chrome overlay path mismatch")
+            result.require(finalized_chrome.get("overlay_sha256") == locked_chrome.get("overlay_sha256"), f"slide {slide_no} locked chrome sha256 mismatch")
+            result.require(finalized_chrome.get("applied") is True, f"slide {slide_no} locked chrome was not applied")
+            result.require(finalized_chrome.get("pixel_match") is True, f"slide {slide_no} locked chrome pixels do not match")
+            result.require(finalized_chrome.get("content_safe_zone_clear") is True, f"slide {slide_no} locked chrome overlaps content safe zone")
+        else:
+            result.require(finalized_chrome.get("applied") is False, f"slide {slide_no} chrome applied when mode is none")
+            result.require(finalized_chrome.get("variant_id") is None, f"slide {slide_no} chrome variant must be null when mode is none")
+
+
 def check_visual_qa(order_dir: Path, result: ValidationResult) -> None:
     check_slide_jobs(order_dir, result)
     check_slide_run_state(order_dir, result)
     check_render_results(order_dir, result)
+    check_finalizations(order_dir, result)
     visual = load_json(order_dir / "05_production" / "visual_qa_result.json", result, "05_production/visual_qa_result.json")
     if not visual:
         return
@@ -921,6 +1289,21 @@ def check_visual_qa(order_dir: Path, result: ValidationResult) -> None:
                 result.require(asset.get("visible_in_output") is True, f"asset_fidelity {slide_id} asset not visible")
                 result.require(asset.get("fidelity_status") == "pass", f"asset_fidelity {slide_id} fidelity_status must be pass")
 
+    jobs_payload = load_slide_jobs(order_dir, result)
+    expected_navigation_slides: set[int] = set()
+    for job_record in (jobs_payload or {}).get("jobs", []):
+        if not isinstance(job_record, dict):
+            continue
+        job_path = resolve_within(order_dir, job_record.get("job_file"))
+        if job_path is None or not job_path.exists():
+            continue
+        try:
+            job = json.loads(job_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if job.get("visual_constraints", {}).get("use_navigation_bar") is True and isinstance(job_record.get("slide_no"), int):
+            expected_navigation_slides.add(job_record["slide_no"])
+
     for report_name, fail_fields in [
         ("style_drift", ["palette_match", "typography_match", "background_match", "layout_family_match"]),
         ("navigation_consistency", ["geometry_match"]),
@@ -930,6 +1313,10 @@ def check_visual_qa(order_dir: Path, result: ValidationResult) -> None:
         result.require(isinstance(records, list), f"visual_qa_result.json {report_name} must be a list")
         if not isinstance(records, list):
             continue
+        if report_name == "navigation_consistency":
+            reported_slides = [record.get("slide_no") for record in records if isinstance(record, dict)]
+            result.require(len(reported_slides) == len(set(reported_slides)), "navigation_consistency contains duplicate slide records")
+            result.require(set(reported_slides) == expected_navigation_slides, "navigation_consistency must cover every and only navigation slide")
         for record in records:
             if not isinstance(record, dict):
                 result.errors.append(f"visual_qa_result.json {report_name} record must be an object")
@@ -938,9 +1325,13 @@ def check_visual_qa(order_dir: Path, result: ValidationResult) -> None:
                 value = record.get(field)
                 if field == "status":
                     result.require(value == "pass", f"{report_name} slide {record.get('slide_no')} status must be pass")
+                elif report_name == "navigation_consistency":
+                    result.require(value == "pass", f"navigation slide {record.get('slide_no')} {field} must be pass")
                 else:
                     result.require(value != "fail", f"{report_name} slide {record.get('slide_no')} {field} must not fail")
             if report_name == "navigation_consistency":
+                result.require(record.get("nav_present") is True, f"navigation slide {record.get('slide_no')} navigation is missing")
+                result.require(record.get("active_section_correct") is True, f"navigation slide {record.get('slide_no')} active section is incorrect")
                 result.require(record.get("needs_regeneration") is False, f"navigation slide {record.get('slide_no')} needs regeneration")
 
 

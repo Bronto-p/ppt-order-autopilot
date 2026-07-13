@@ -164,6 +164,7 @@ WAITING_OWNER_CONFIRMATION
 {
   "order_id": "2026-07-05_001",
   "state": "WAITING_OWNER_CONFIRMATION",
+  "previous_state": "READY_FOR_OWNER_DECISION",
   "fixed_contact": "客服A",
   "last_action": "generated_missing_questions",
   "next_action": "ask_owner_to_confirm_questions",
@@ -174,3 +175,5 @@ WAITING_OWNER_CONFIRMATION
   "blocked_reason": null
 }
 ```
+
+`previous_state` 是必填的迁移证据；只有初始 `IDLE` 可以为 `null`。Validator 同时检查 `previous_state -> state` 是否存在于 `allowed_next`，不允许通过省略字段绕过转移规则。

@@ -138,7 +138,6 @@
           "geometry_match": {
             "enum": [
               "pass",
-              "medium",
               "fail",
               "not_applicable"
             ]

@@ -10,6 +10,7 @@ Each slide worker receives one self-contained material bundle. Workers must not 
 │   ├── style_anchor.png
 │   ├── template_master.png
 │   ├── navigation_bar.png
+│   ├── locked_chrome.png
 │   ├── page_family_ref.png
 │   └── client_required_image_001.png
 └── attempts/
@@ -81,9 +82,11 @@ Workers should return a result that records:
 - `job.json` is the immutable base job and uses `attempt: 1`.
 - Every dispatch snapshots the exact job and prompt under `attempts/attempt_XX/` before calling a worker.
 - Parent QA accepts or rejects an attempt; workers never accept their own output.
+- Workers write only an attempt-local raw image. They never write `origin_image/slide_XX.png`.
+- When `locked_chrome.mode=post_generation_composite`, the worker treats the overlay as a placement/safe-zone reference but does not redraw it. The parent applies the exact overlay after accepting the raw attempt and writes `finalization.json`.
 - A rejected attempt creates `repair_job.json` with failure class, evidence files, narrow repair instructions, and must-preserve constraints.
 - Repair workers receive the base job, the rejected output, QA evidence, and the repair job. They must not reinterpret the customer request.
-- Never overwrite a prior attempt. Copy only the accepted output to `origin_image/slide_XX.png` and record `accepted_attempt`.
+- Never overwrite a prior attempt. Finalize only the accepted output into `origin_image/slide_XX.png`, record `accepted_attempt`, and preserve the raw image separately.
 - Automatic generation stops after `max_attempts` (maximum 3). Missing source truth or required assets blocks immediately instead of consuming retries.
 
 If a required input image is unavailable or not visible to the backend, the worker must return a blocker and must not use a text-only fallback.
