@@ -65,7 +65,7 @@ python3 tools/validate_order.py orders/2026-07-05_001_商业计划书 --gate dec
 4. 写入 `pending_approval.json` 和 `decision.md` 后跑 `--gate decision`。
 5. 写入 approved approval record 和 `production_contract.json` 后跑 `--gate production`。
 6. 跑 `--gate contract_accuracy` 确认 contract 足够精确。
-7. 样稿通过并生成 `style_master/` 后跑 `--gate sample_accuracy`。
+7. 样稿通过并生成 `style_kit/` 后跑 `--gate sample_accuracy`。
 8. 生成 `slide_jobs/slide_jobs.json` 和每页 `slide_jobs/slide_XX/job.json` 材料包后跑 `--gate slide_jobs`。
 9. 所有 slide worker 完成并生成 `visual_qa_result.json` 后跑 `--gate visual_qa`。
 10. 写入交付物、`qa_result.json` 和 `qa_report.md` 后跑 `--gate qa`。

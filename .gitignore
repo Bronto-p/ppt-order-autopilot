@@ -12,11 +12,14 @@ tmp/
 # Runtime private data
 orders/*
 !orders/.gitkeep
+inbox/*
+!inbox/.gitkeep
 
 # Global runtime ledgers
 ledgers/*.jsonl
 ledgers/*.sqlite
 ledgers/*.db
+ledgers/automation_state.json
 !ledgers/README.md
 !ledgers/schemas/
 !ledgers/schemas/**

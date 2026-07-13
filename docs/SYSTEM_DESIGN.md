@@ -62,6 +62,8 @@ owner delivery approval
 
 `ppt-business-orchestrator` 是总控。它只读写订单状态和账本，决定下一步应该调用哪个 skill。
 
+订单出现前，它使用全局 automation state 和 `inbox/{inquiry_id}/` 管理询单、回复检查和临时下载；识别订单后才创建正式订单目录。这样不要求用户预先整理客户材料，也不需要用未知标题创建假订单。
+
 它不直接操作企业微信，不直接做 PPT，也不直接发送业务消息。
 
 ### UI Adapter

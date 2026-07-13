@@ -14,7 +14,7 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 - `03_requirements/production_contract.json`
 - `04_sample/approved_sample_reference.json`
 - `04_sample/style_kit/*`
-- `05_production/slide_jobs.json`
+- `05_production/slide_jobs/slide_jobs.json`
 - `05_production/slide_run_state.json`
 - `05_production/origin_image/*.png`
 
@@ -33,7 +33,7 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 - Strict assets were not redrawn as lookalikes.
 - Style matches `style_anchor.png`.
 - Template and title hierarchy match `template_master.png`.
-- Navigation geometry matches `navigation_bar_reference.png`.
+- Navigation geometry matches `navigation_bar.png`.
 - Active section highlight is correct.
 - Locked logo/footer/page-number regions stay stable.
 - Chinese text is readable.

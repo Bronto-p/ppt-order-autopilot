@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PPT Order Autopilot Global State",
+  "type": "object",
+  "required": [
+    "state_version",
+    "state",
+    "active_contact_id",
+    "active_inquiry_id",
+    "active_order_id",
+    "updated_at",
+    "blocked_reason"
+  ],
+  "properties": {
+    "state_version": {
+      "const": 1
+    },
+    "state": {
+      "enum": [
+        "IDLE",
+        "ASK_DUE",
+        "ASK_PREPARED",
+        "WAITING_REPLY",
+        "REPLY_DETECTED",
+        "PROMOTING_INQUIRY",
+        "ORDER_ACTIVE",
+        "NO_REPLY_STOPPED",
+        "BLOCKED"
+      ]
+    },
+    "active_contact_id": {
+      "type": ["string", "null"]
+    },
+    "active_inquiry_id": {
+      "type": ["string", "null"]
+    },
+    "active_order_id": {
+      "type": ["string", "null"]
+    },
+    "last_scheduled_ask_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "next_reply_check_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "reply_check_offset_minutes": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "locked_by": {
+      "type": ["string", "null"]
+    },
+    "lock_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "blocked_reason": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}
