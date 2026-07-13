@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WeCom Inquiry State",
+  "type": "object",
+  "required": [
+    "state_version",
+    "inquiry_id",
+    "contact_id",
+    "state",
+    "ask_message_hash",
+    "completed_reply_checks_minutes",
+    "promoted_order_ids",
+    "updated_at",
+    "blocked_reason"
+  ],
+  "properties": {
+    "state_version": {
+      "const": 1
+    },
+    "inquiry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "PREPARED",
+        "SENT",
+        "WAITING_REPLY",
+        "REPLY_DETECTED",
+        "CAPTURING",
+        "PROMOTED",
+        "NO_REPLY",
+        "BLOCKED"
+      ]
+    },
+    "ask_message_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "sent_message_ledger_id": {
+      "type": ["string", "null"]
+    },
+    "sent_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "completed_reply_checks_minutes": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "uniqueItems": true
+    },
+    "next_reply_check_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "reply_detected_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "promoted_order_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "blocked_reason": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}
