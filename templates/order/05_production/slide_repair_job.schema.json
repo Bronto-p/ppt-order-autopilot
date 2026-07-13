@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Slide Repair Job",
+  "type": "object",
+  "required": [
+    "job_id",
+    "slide_no",
+    "attempt",
+    "repair_of",
+    "failure_class",
+    "evidence_files",
+    "repair_instructions",
+    "must_preserve",
+    "base_job_file",
+    "output_image"
+  ],
+  "properties": {
+    "job_id": {"type": "string", "minLength": 1},
+    "slide_no": {"type": "integer", "minimum": 1},
+    "attempt": {"type": "integer", "minimum": 2, "maximum": 3},
+    "repair_of": {"type": "integer", "minimum": 1, "maximum": 2},
+    "failure_class": {
+      "enum": [
+        "missing_asset",
+        "content_error",
+        "text_error",
+        "style_drift",
+        "layout_error",
+        "backend_error",
+        "other"
+      ]
+    },
+    "evidence_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "repair_instructions": {"type": "string", "minLength": 1},
+    "must_preserve": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "base_job_file": {"type": "string", "minLength": 1},
+    "output_image": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -17,10 +17,10 @@ Standard PPT QA checks that files open and text is readable. Image-based PPT pro
 
 - required assets are visible and not redrawn as lookalikes.
 - style drift from `style_anchor.png` is within tolerance.
-- navigation geometry matches `navigation_bar_reference.png`.
+- navigation geometry matches `navigation_bar.png`.
 - active section highlight is correct.
 - title hierarchy is consistent.
 - locked logo/footer/page-number zones are stable.
 - Chinese text is readable and not garbled.
 - every accepted slide has a worker result with no blockers.
-
+- every accepted slide identifies an accepted attempt preserved in `slide_run_state.json`.
