@@ -12,8 +12,10 @@
 
 ```text
 ppt-order-autopilot/
+├── AGENTS.md               # Agent 唯一启动入口
 ├── configs/                 # 白名单、排程、消息策略示例
 ├── docs/                    # 系统设计和硬边界文档
+├── inbox/                   # 订单识别前的询单与下载暂存
 ├── ledgers/                 # 全局账本占位
 ├── orders/                  # 真实订单目录
 ├── skills/                  # 每个业务层的 skill 契约骨架
@@ -56,6 +58,14 @@ MVP 的成功标准是：
 - 中断后能从 `state.json` 恢复。
 
 ## 快速开始
+
+### Agent 运行
+
+在完成一次性 live config 后，直接要求 Agent “运行 PPT Order Autopilot”。Agent 必须按照根目录 `AGENTS.md` 从企业微信询单开始，而不是要求你先创建订单文件夹。
+
+运行入口和恢复规则见 [Agent Run Loop](docs/AGENT_RUN_LOOP.md)。
+
+### 手动诊断
 
 初始化一个新订单目录：
 
