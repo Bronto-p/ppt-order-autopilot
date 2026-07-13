@@ -130,17 +130,19 @@
 - 制作样稿 PPT/PDF。
 - 样稿 QA。
 - 生成样稿交付话术。
+- 记录发送 receipt 和客户样稿决策证据。
 
 硬规则：
 
 - 样稿是否需要不能默认。
 - 样稿交付必须人工确认。
+- 样稿发出后必须等客户明确通过才能进正稿；含糊反馈才请 owner 判断。
 
 ## 8. ppt-style-master-builder
 
 职责：
 
-- 读取 production contract、素材索引、可选样稿产物和 approval。
+- 读取 production contract、素材索引、可选样稿产物和客户样稿决策。
 - 有样稿时生成 `approved_sample_reference.json`；直接生产时记录客户模板、源 deck 或已批准 style brief。
 - 生成 `04_sample/style_kit/*` 图像锚点和 JSON 规则。
 

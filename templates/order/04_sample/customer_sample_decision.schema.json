@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Customer Sample Decision",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "order_id",
+    "status",
+    "source_message_ids",
+    "evidence_text",
+    "confidence",
+    "captured_at"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "order_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "approved",
+        "revision_requested",
+        "ambiguous"
+      ]
+    },
+    "source_message_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "evidence_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_changes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "revision_requested"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "requested_changes"
+        ],
+        "properties": {
+          "requested_changes": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

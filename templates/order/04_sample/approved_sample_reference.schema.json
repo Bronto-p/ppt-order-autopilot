@@ -3,11 +3,15 @@
   "title": "Approved Sample Reference",
   "type": "object",
   "required": [
+    "customer_decision_path",
     "approved_samples",
     "style_kit",
     "must_match_in_production"
   ],
   "properties": {
+    "customer_decision_path": {
+      "const": "04_sample/customer_sample_decision.json"
+    },
     "approved_samples": {
       "type": "array",
       "minItems": 1,
