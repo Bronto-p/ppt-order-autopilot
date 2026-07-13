@@ -48,7 +48,7 @@ Workers should return a result that records:
   "backend_used": "same_as_sample",
   "input_images_seen": [
     "style_anchor.png",
-    "navigation_bar_reference.png",
+    "navigation_bar.png",
     "chart_001.png"
   ],
   "asset_fidelity_check": "chart_001 appears as supplied; labels preserved",

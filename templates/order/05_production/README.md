@@ -7,7 +7,7 @@
 生产 core 不直接做页面，而是拆成：
 
 ```text
-1. build style master
+1. build style kit
 2. build slide jobs
 3. dispatch one slide per worker
 4. visual consistency QA

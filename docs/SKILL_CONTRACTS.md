@@ -142,12 +142,12 @@
 
 - 读取样稿产物和 approval。
 - 生成 `approved_sample_reference.json`。
-- 生成 `04_sample/style_master/*` 图像锚点和 JSON 规则。
+- 生成 `04_sample/style_kit/*` 图像锚点和 JSON 规则。
 
 硬规则：
 
-- 没有 approved sample，不生成 style master。
-- style master 必须包含图像参考和 locked element 规则。
+- 没有 approved sample，不生成 style kit。
+- style kit 必须包含图像参考和 locked element 规则。
 
 ## 9. ppt-slide-job-packager
 
