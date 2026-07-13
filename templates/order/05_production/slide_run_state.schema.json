@@ -21,17 +21,26 @@
       "items": {
         "type": "object",
         "required": [
+          "job_id",
           "slide_no",
           "bundle_dir",
           "job_file",
           "render_result_file",
           "status",
+          "current_attempt",
+          "max_attempts",
+          "accepted_attempt",
+          "attempts",
           "selected_source",
           "backend_used",
           "input_images_seen",
           "blockers"
         ],
         "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "slide_no": {
             "type": "integer",
             "minimum": 1
@@ -53,10 +62,89 @@
               "queued",
               "dispatched",
               "recorded",
+              "repair_pending",
               "accepted",
               "blocked",
               "failed"
             ]
+          },
+          "current_attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "max_attempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "accepted_attempt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 3
+          },
+          "attempts": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "attempt",
+                "status",
+                "job_snapshot_file",
+                "render_result_file",
+                "output_image",
+                "failure_class",
+                "repair_instructions"
+              ],
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "status": {
+                  "enum": [
+                    "queued",
+                    "dispatched",
+                    "recorded",
+                    "accepted",
+                    "rejected",
+                    "blocked",
+                    "failed"
+                  ]
+                },
+                "job_snapshot_file": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "render_result_file": {
+                  "type": ["string", "null"]
+                },
+                "output_image": {
+                  "type": ["string", "null"]
+                },
+                "failure_class": {
+                  "enum": [
+                    "none",
+                    "missing_asset",
+                    "content_error",
+                    "text_error",
+                    "style_drift",
+                    "layout_error",
+                    "backend_error",
+                    "other"
+                  ]
+                },
+                "repair_instructions": {
+                  "type": ["string", "null"]
+                }
+              },
+              "additionalProperties": false
+            }
           },
           "selected_source": {
             "type": [

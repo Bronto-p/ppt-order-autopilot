@@ -24,6 +24,9 @@ slide_jobs/
 │   ├── job.json
 │   ├── prompt.md
 │   ├── render_result.json
+│   ├── attempts/
+│   │   ├── attempt_01/
+│   │   └── attempt_02/
 │   └── input_images/
 ├── slide_02/
 │   ├── job.json
@@ -37,3 +40,5 @@ visual_qa_result.json
 ```
 
 每个 `slide_jobs/slide_XX/job.json` 必须是 self-contained job。subagent 只能看到本页 `job.json`、`prompt.md` 和本页 `input_images/` 里的真实文件，不能回头翻 raw 附件目录。
+
+`job.json` 是不可覆盖的基础任务。每次派发都在 `attempts/attempt_XX/` 保存快照、结果和输出；修复使用独立 `repair_job.json`。只有 accepted attempt 可以复制到 `origin_image/slide_XX.png`。

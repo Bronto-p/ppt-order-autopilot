@@ -6,17 +6,28 @@ Each slide worker receives one self-contained material bundle. Workers must not 
 05_production/slide_jobs/slide_07/
 ├── job.json
 ├── prompt.md
-└── input_images/
-    ├── style_anchor.png
-    ├── template_master.png
-    ├── navigation_bar.png
-    ├── page_family_ref.png
-    └── client_required_image_001.png
+├── input_images/
+│   ├── style_anchor.png
+│   ├── template_master.png
+│   ├── navigation_bar.png
+│   ├── page_family_ref.png
+│   └── client_required_image_001.png
+└── attempts/
+    ├── attempt_01/
+    │   ├── job_snapshot.json
+    │   ├── render_result.json
+    │   └── output.png
+    └── attempt_02/
+        ├── repair_job.json
+        ├── render_result.json
+        └── output.png
 ```
 
 ## Required Job Contents
 
-- `slide_id`
+- `job_id`
+- `attempt`
+- `max_attempts`
 - `slide_no`
 - `title`
 - `page_type`
@@ -43,20 +54,37 @@ Workers should return a result that records:
 
 ```json
 {
+  "job_id": "2026-07-05_001:slide_07",
+  "attempt": 1,
   "status": "success",
-  "selected_source": "05_production/origin_image/slide_07.png",
-  "backend_used": "same_as_sample",
+  "output_image": "05_production/slide_jobs/slide_07/attempts/attempt_01/output.png",
   "input_images_seen": [
     "style_anchor.png",
     "navigation_bar.png",
     "chart_001.png"
   ],
-  "asset_fidelity_check": "chart_001 appears as supplied; labels preserved",
-  "style_check": "matches style_anchor palette and title hierarchy",
-  "text_check": "Chinese title and bullets readable",
+  "asset_fidelity": [
+    {
+      "asset": "chart_001.png",
+      "status": "pass",
+      "notes": "appears as supplied; labels preserved"
+    }
+  ],
+  "style_match": "pass",
+  "text_readability": "pass",
   "blockers": []
 }
 ```
+
+## Attempt And Repair Rules
+
+- `job.json` is the immutable base job and uses `attempt: 1`.
+- Every dispatch snapshots the exact job and prompt under `attempts/attempt_XX/` before calling a worker.
+- Parent QA accepts or rejects an attempt; workers never accept their own output.
+- A rejected attempt creates `repair_job.json` with failure class, evidence files, narrow repair instructions, and must-preserve constraints.
+- Repair workers receive the base job, the rejected output, QA evidence, and the repair job. They must not reinterpret the customer request.
+- Never overwrite a prior attempt. Copy only the accepted output to `origin_image/slide_XX.png` and record `accepted_attempt`.
+- Automatic generation stops after `max_attempts` (maximum 3). Missing source truth or required assets blocks immediately instead of consuming retries.
 
 If a required input image is unavailable or not visible to the backend, the worker must return a blocker and must not use a text-only fallback.
 
@@ -64,4 +92,4 @@ If a required input image is unavailable or not visible to the backend, the work
 
 Ask the owner for anything that changes customer commitments: sending messages, accepting/rejecting orders, price, deadline, scope, sample delivery, final delivery, major revision, extra pages, style reset, payment, or repeated QA failures.
 
-Do not ask for internal actions: order folder setup, transcript/OCR, attachment indexing, draft requirements, draft production contract, slide job packaging, first automatic regeneration, PDF export, QA report generation, or delivery message drafting.
+Do not ask for internal actions: order folder setup, transcript/OCR, attachment indexing, draft requirements, draft production contract, slide job packaging, permitted automatic repairs, PDF export, QA report generation, or delivery message drafting.

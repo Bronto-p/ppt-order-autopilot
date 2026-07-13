@@ -11,6 +11,7 @@ Samples are one source of visual anchors, not a universal gate. Every production
 ├── template_master.png
 ├── navigation_bar.png
 ├── cover_ref.png
+├── section_ref.png
 ├── content_ref.png
 ├── data_ref.png
 ├── image_heavy_ref.png

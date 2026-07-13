@@ -23,3 +23,4 @@ Standard PPT QA checks that files open and text is readable. Image-based PPT pro
 - locked logo/footer/page-number zones are stable.
 - Chinese text is readable and not garbled.
 - every accepted slide has a worker result with no blockers.
+- every accepted slide identifies an accepted attempt preserved in `slide_run_state.json`.

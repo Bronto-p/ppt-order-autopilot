@@ -219,6 +219,7 @@ class ValidateOrderTests(unittest.TestCase):
                 "contract_path": "03_requirements/production_contract.json",
                 "jobs": [
                     {
+                        "job_id": "test-order:slide_01",
                         "slide_no": 1,
                         "bundle_dir": "05_production/slide_jobs/slide_01",
                         "job_file": "05_production/slide_jobs/slide_01/job.json",
@@ -233,9 +234,27 @@ class ValidateOrderTests(unittest.TestCase):
         write_json(
             bundle_dir / "job.json",
             {
+                "job_id": "test-order:slide_01",
+                "attempt": 1,
+                "max_attempts": 3,
+                "repair_of": None,
                 "slide_no": 1,
                 "page_type": "content",
                 "title": "测试 PPT",
+                "deck_context": {
+                    "deck_title": "测试 PPT",
+                    "goal": "验证自动化生产",
+                    "audience": "测试用户",
+                    "story_summary": "封面到内容结论",
+                    "total_slides": 1,
+                    "language": "zh-CN",
+                },
+                "local_context": {
+                    "section": "测试",
+                    "slide_purpose": "展示测试内容",
+                    "previous_slide_summary": None,
+                    "next_slide_summary": None,
+                },
                 "exact_content": {"title": "测试 PPT", "bullets": ["第一点"]},
                 "input_images": [
                     {"image_id": "style_anchor", "bundle_path": "input_images/style_anchor.png", "role": "style_anchor", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
@@ -243,6 +262,12 @@ class ValidateOrderTests(unittest.TestCase):
                     {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
                 ],
                 "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False, "locked_elements": "use style kit rules if provided"},
+                "backend": {
+                    "selected_backend": "test-image-backend",
+                    "mode": "image_edit",
+                    "requires_image_inputs": True,
+                },
+                "qa_requirements": ["exact_content", "text_readability", "asset_fidelity", "style_match"],
                 "worker_policy": {
                     "reasoning_level": reasoning_level,
                     "image_generation_only": True,
@@ -419,9 +444,15 @@ class ValidateOrderTests(unittest.TestCase):
         self.add_style_kit(order_dir)
         self.add_slide_jobs(order_dir)
         write_json(order_dir / "05_production" / "slide_jobs" / "slide_01" / "job.json", {
+            "job_id": "test-order:slide_01",
+            "attempt": 1,
+            "max_attempts": 3,
+            "repair_of": None,
             "slide_no": 1,
             "page_type": "content",
             "title": "测试 PPT",
+            "deck_context": {"deck_title": "测试 PPT"},
+            "local_context": {"slide_purpose": "测试"},
             "exact_content": {},
             "input_images": [
                 {"image_id": "style_anchor", "bundle_path": "input_images/style_anchor.png", "role": "style_anchor", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
@@ -429,6 +460,8 @@ class ValidateOrderTests(unittest.TestCase):
                 {"image_id": "page_family", "bundle_path": "input_images/page_family_ref.png", "role": "page_family_reference", "required": True, "fidelity_rule": "style reference only", "if_missing": "block"},
             ],
             "visual_constraints": {"must_match_style_anchor": True, "use_navigation_bar": False},
+            "backend": {"selected_backend": "test-image-backend", "mode": "image_edit", "requires_image_inputs": True},
+            "qa_requirements": ["exact_content", "text_readability", "style_match"],
             "worker_policy": {"reasoning_level": "high", "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
         })
 
@@ -446,6 +479,22 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("worker reasoning must be medium/high", result.stdout)
 
+    def test_slide_jobs_require_deck_and_local_context(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+        self.add_slide_jobs(order_dir)
+        job_path = order_dir / "05_production" / "slide_jobs" / "slide_01" / "job.json"
+        job = json.loads(job_path.read_text(encoding="utf-8"))
+        job.pop("deck_context")
+        job.pop("local_context")
+        write_json(job_path, job)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("deck_context must be a non-empty object", result.stdout)
+        self.assertIn("local_context must be a non-empty object", result.stdout)
+
     def test_visual_qa_rejects_invisible_required_asset(self) -> None:
         order_dir = self.prepare_order_through_production()
         write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
@@ -456,6 +505,8 @@ class ValidateOrderTests(unittest.TestCase):
         write_json(
             order_dir / "05_production" / "slide_jobs" / "slide_01" / "render_result.json",
             {
+                "job_id": "test-order:slide_01",
+                "attempt": 1,
                 "slide_no": 1,
                 "status": "success",
                 "output_image": "05_production/origin_image/slide_01.png",
@@ -472,11 +523,26 @@ class ValidateOrderTests(unittest.TestCase):
                 "status": "complete",
                 "slides": [
                     {
+                        "job_id": "test-order:slide_01",
                         "slide_no": 1,
                         "bundle_dir": "05_production/slide_jobs/slide_01",
                         "job_file": "05_production/slide_jobs/slide_01/job.json",
                         "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
                         "status": "accepted",
+                        "current_attempt": 1,
+                        "max_attempts": 3,
+                        "accepted_attempt": 1,
+                        "attempts": [
+                            {
+                                "attempt": 1,
+                                "status": "accepted",
+                                "job_snapshot_file": "05_production/slide_jobs/slide_01/job.json",
+                                "render_result_file": "05_production/slide_jobs/slide_01/render_result.json",
+                                "output_image": "05_production/origin_image/slide_01.png",
+                                "failure_class": "none",
+                                "repair_instructions": None,
+                            }
+                        ],
                         "selected_source": "05_production/origin_image/slide_01.png",
                         "backend_used": "same_as_sample",
                         "input_images_seen": ["style_anchor.png"],

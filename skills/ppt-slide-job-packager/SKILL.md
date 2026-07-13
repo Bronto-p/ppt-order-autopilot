@@ -40,6 +40,9 @@ Raw attachments 只允许 packager 读取，用来复制到每页 bundle。produ
 
 Each `job.json` must include:
 
+- stable `job_id`, base `attempt: 1`, and `max_attempts` no greater than 3.
+- deck goal, audience, story summary, total slides, and language.
+- local section, slide purpose, and previous/next slide summaries.
 - exact slide-ready content.
 - bundled `input_images` with `bundle_path`.
 - image role and fidelity rule for every bundled image.
@@ -49,6 +52,8 @@ Each `job.json` must include:
 - navigation bar image when the slide uses navigation.
 - strict client assets assigned to that slide.
 - worker reasoning level.
+- selected backend and mode.
+- explicit QA requirements.
 - text-only fallback prohibition.
 
 ## Hard Rules
@@ -58,4 +63,4 @@ Each `job.json` must include:
 3. No `low` reasoning level.
 4. Pages with strict assets, navigation, data, old PPT references, timeline, process, cover, or sample roles must use `high`.
 5. Subagents must not read raw attachments, chat logs, order brief, or full production contract.
-
+6. `job.json` and each dispatched attempt snapshot are immutable; repair attempts use a separate repair job.

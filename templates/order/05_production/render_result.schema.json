@@ -3,6 +3,8 @@
   "title": "Slide Render Result",
   "type": "object",
   "required": [
+    "job_id",
+    "attempt",
     "slide_no",
     "status",
     "output_image",
@@ -13,6 +15,15 @@
     "blockers"
   ],
   "properties": {
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
     "slide_no": {
       "type": "integer",
       "minimum": 1

@@ -607,12 +607,24 @@ def load_slide_jobs(order_dir: Path, result: ValidationResult) -> dict[str, Any]
     return load_json(order_dir / "05_production" / "slide_jobs" / "slide_jobs.json", result, "05_production/slide_jobs/slide_jobs.json")
 
 
-def check_slide_job_payload(order_dir: Path, job_path: Path, result: ValidationResult, expected_slide_no: int, bundle_dir: Path) -> None:
+def check_slide_job_payload(
+    order_dir: Path,
+    job_path: Path,
+    result: ValidationResult,
+    expected_job_id: str,
+    expected_slide_no: int,
+    bundle_dir: Path,
+) -> None:
     rel_label = str(job_path.relative_to(order_dir))
     job = load_json(job_path, result, rel_label)
     if not job:
         return
+    result.require(job.get("job_id") == expected_job_id, f"{rel_label} job_id does not match slide_jobs.json")
     result.require(job.get("slide_no") == expected_slide_no, f"{rel_label} slide_no does not match slide_jobs.json")
+    result.require(job.get("attempt") == 1, f"{rel_label} base job attempt must be 1")
+    result.require(isinstance(job.get("max_attempts"), int) and 1 <= job["max_attempts"] <= 3, f"{rel_label} max_attempts must be 1-3")
+    result.require(isinstance(job.get("deck_context"), dict) and bool(job.get("deck_context")), f"{rel_label} deck_context must be a non-empty object")
+    result.require(isinstance(job.get("local_context"), dict) and bool(job.get("local_context")), f"{rel_label} local_context must be a non-empty object")
     check_exact_content(rel_label, job.get("exact_content"), result)
     result.require(isinstance(job.get("visual_constraints"), dict) and bool(job.get("visual_constraints")), f"{rel_label} visual_constraints must be a non-empty object")
     input_images = job.get("input_images")
@@ -621,6 +633,17 @@ def check_slide_job_payload(order_dir: Path, job_path: Path, result: ValidationR
     result.require(roles & STYLE_ANCHOR_ROLES, f"{rel_label} missing style anchor input")
     result.require(roles & TEMPLATE_ROLES, f"{rel_label} missing template reference input")
     result.require(roles & PAGE_FAMILY_ROLES, f"{rel_label} missing page family reference input")
+    backend = job.get("backend")
+    backend_is_named = isinstance(backend, dict) and not is_empty_value(backend.get("selected_backend"))
+    result.require(backend_is_named, f"{rel_label} backend must name selected_backend")
+    if isinstance(backend, dict):
+        result.require(backend.get("mode") in {"reference_guided_generation", "image_edit"}, f"{rel_label} backend mode is invalid")
+        result.require(backend.get("requires_image_inputs") is True, f"{rel_label} backend must support image inputs")
+    qa_requirements = job.get("qa_requirements")
+    result.require(isinstance(qa_requirements, list) and bool(qa_requirements), f"{rel_label} qa_requirements must not be empty")
+    if isinstance(qa_requirements, list):
+        required_qa = {"exact_content", "text_readability", "style_match"}
+        result.require(required_qa <= set(qa_requirements), f"{rel_label} qa_requirements missing core checks")
     if isinstance(input_images, list):
         for image_index, image in enumerate(input_images, start=1):
             if not isinstance(image, dict):
@@ -663,16 +686,22 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
         result.require(len(jobs) == page_count, "slide_jobs.json jobs count must equal deck.page_count")
     if not isinstance(jobs, list):
         return
+    seen_job_ids: set[str] = set()
     for index, job_record in enumerate(jobs, start=1):
         result.require(isinstance(job_record, dict), f"slide_jobs.json record {index} must be an object")
         if not isinstance(job_record, dict):
             continue
+        job_id = job_record.get("job_id")
         slide_no = job_record.get("slide_no")
         bundle_dir = job_record.get("bundle_dir")
         job_file = job_record.get("job_file")
         prompt_file = job_record.get("prompt_file")
         input_images_dir = job_record.get("input_images_dir")
         output_image = job_record.get("output_image")
+        result.require(isinstance(job_id, str) and bool(job_id), f"slide_jobs.json record {index} missing job_id")
+        if isinstance(job_id, str):
+            result.require(job_id not in seen_job_ids, f"duplicate slide job_id: {job_id}")
+            seen_job_ids.add(job_id)
         result.require(isinstance(slide_no, int), f"slide_jobs.json record {index} missing slide_no")
         result.require(isinstance(bundle_dir, str) and bundle_dir.startswith("05_production/slide_jobs/slide_"), f"slide_jobs.json record {index} invalid bundle_dir")
         result.require(isinstance(job_file, str) and job_file.endswith("/job.json"), f"slide_jobs.json record {index} invalid job_file")
@@ -688,9 +717,47 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
             result.require(exists_nonempty(prompt_path), f"slide_jobs.json record {index} missing prompt_file")
         if input_path is not None:
             result.require(input_path.is_dir(), f"slide_jobs.json record {index} missing input_images_dir")
-        if isinstance(slide_no, int) and isinstance(job_file, str) and isinstance(bundle_dir, str):
-            if job_path is not None and bundle_path is not None:
-                check_slide_job_payload(order_dir, job_path, result, slide_no, bundle_path)
+        if isinstance(job_id, str) and isinstance(slide_no, int) and job_path is not None and bundle_path is not None:
+            check_slide_job_payload(order_dir, job_path, result, job_id, slide_no, bundle_path)
+
+
+def check_slide_attempt_history(
+    slide: dict[str, Any],
+    index: int,
+    result: ValidationResult,
+    current_attempt: Any,
+    max_attempts: Any,
+    accepted_attempt: Any,
+) -> None:
+    attempts = slide.get("attempts")
+    result.require(isinstance(attempts, list) and bool(attempts), f"slide_run_state slide {index} attempts must not be empty")
+    if not isinstance(attempts, list):
+        return
+
+    records = [attempt for attempt in attempts if isinstance(attempt, dict)]
+    result.require(len(records) == len(attempts), f"slide_run_state slide {index} attempt records must be objects")
+    attempt_numbers = [attempt.get("attempt") for attempt in records]
+    result.require(len(attempt_numbers) == len(set(attempt_numbers)), f"slide_run_state slide {index} has duplicate attempts")
+
+    if isinstance(current_attempt, int):
+        result.require(current_attempt in attempt_numbers, f"slide_run_state slide {index} current_attempt missing from history")
+        result.require(set(attempt_numbers) == set(range(1, current_attempt + 1)), f"slide_run_state slide {index} attempt history must be contiguous")
+    if isinstance(max_attempts, int):
+        result.require(len(records) <= max_attempts, f"slide_run_state slide {index} has more records than max_attempts")
+
+    for attempt in records:
+        attempt_no = attempt.get("attempt")
+        result.require(isinstance(attempt_no, int), f"slide_run_state slide {index} attempt number is invalid")
+        result.require(not is_empty_value(attempt.get("job_snapshot_file")), f"slide_run_state slide {index} attempt {attempt_no} missing job snapshot")
+        if attempt.get("status") == "accepted":
+            result.require(not is_empty_value(attempt.get("render_result_file")), f"slide_run_state slide {index} accepted attempt missing render result")
+            result.require(not is_empty_value(attempt.get("output_image")), f"slide_run_state slide {index} accepted attempt missing output")
+        if attempt.get("status") == "rejected":
+            result.require(attempt.get("failure_class") not in {None, "none"}, f"slide_run_state slide {index} rejected attempt missing failure class")
+            result.require(not is_empty_value(attempt.get("repair_instructions")), f"slide_run_state slide {index} rejected attempt missing repair instructions")
+
+    accepted = [attempt for attempt in records if attempt.get("attempt") == accepted_attempt]
+    result.require(bool(accepted) and accepted[0].get("status") == "accepted", f"slide_run_state slide {index} accepted attempt is not recorded")
 
 
 def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
@@ -706,7 +773,17 @@ def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
         if not isinstance(slide, dict):
             continue
         status = slide.get("status")
-        result.require(status in {"recorded", "accepted"}, f"slide_run_state slide {index} status must be recorded/accepted")
+        result.require(status == "accepted", f"slide_run_state slide {index} status must be accepted before visual QA")
+        result.require(not is_empty_value(slide.get("job_id")), f"slide_run_state slide {index} missing job_id")
+        current_attempt = slide.get("current_attempt")
+        max_attempts = slide.get("max_attempts")
+        accepted_attempt = slide.get("accepted_attempt")
+        result.require(isinstance(current_attempt, int) and current_attempt >= 1, f"slide_run_state slide {index} current_attempt is invalid")
+        result.require(isinstance(max_attempts, int) and 1 <= max_attempts <= 3, f"slide_run_state slide {index} max_attempts must be 1-3")
+        if isinstance(current_attempt, int) and isinstance(max_attempts, int):
+            result.require(current_attempt <= max_attempts, f"slide_run_state slide {index} exceeded max_attempts")
+        result.require(isinstance(accepted_attempt, int), f"slide_run_state slide {index} accepted_attempt is required")
+        check_slide_attempt_history(slide, index, result, current_attempt, max_attempts, accepted_attempt)
         result.require(not slide.get("blockers"), f"slide_run_state slide {index} has blockers")
         result.require(not is_empty_value(slide.get("render_result_file")), f"slide_run_state slide {index} missing render_result_file")
         result.require(not is_empty_value(slide.get("selected_source")), f"slide_run_state slide {index} missing selected_source")
@@ -724,6 +801,7 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         if not isinstance(job_record, dict):
             continue
         slide_no = job_record.get("slide_no", index)
+        job_id = job_record.get("job_id")
         result_file = job_record.get("render_result_file")
         output_image = job_record.get("output_image")
         result.require(isinstance(result_file, str), f"slide {slide_no} missing render_result_file")
@@ -735,6 +813,8 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         render = load_json(render_path, result, result_file)
         if not render:
             continue
+        result.require(render.get("job_id") == job_id, f"{result_file} job_id mismatch")
+        result.require(isinstance(render.get("attempt"), int) and 1 <= render["attempt"] <= 3, f"{result_file} attempt is invalid")
         result.require(render.get("slide_no") == slide_no, f"{result_file} slide_no mismatch")
         result.require(render.get("status") == "success", f"{result_file} status must be success")
         result.require(not render.get("blockers"), f"{result_file} blockers must be empty")
