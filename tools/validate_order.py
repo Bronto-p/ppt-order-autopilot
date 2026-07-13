@@ -15,6 +15,7 @@ ALLOWED_REQUIREMENT_CONFIDENCE = {"high", "medium", "low", "inferred", "missing"
 ALLOWED_ATTACHMENT_STATUS = {"success", "failed", "skipped"}
 ALLOWED_QA_STATUS = {"pass", "blocked", "failed"}
 ALLOWED_WORKER_REASONING = {"medium", "high"}
+ALLOWED_STYLE_SOURCES = {"approved_sample", "customer_template", "source_deck", "approved_style_brief"}
 STYLE_ANCHOR_ROLES = {"approved_sample_style_anchor", "style_anchor"}
 TEMPLATE_ROLES = {"template_reference", "template_master"}
 PAGE_FAMILY_ROLES = {"page_family_reference", "cover_reference", "section_reference", "content_reference", "data_reference", "image_heavy_reference"}
@@ -408,6 +409,7 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
     if isinstance(style_kit, dict):
         result.require(style_kit.get("path") == "04_sample/style_kit/style_kit.json", "style_kit.path must point to 04_sample/style_kit/style_kit.json")
         result.require(isinstance(style_kit.get("required"), bool), "style_kit.required must be boolean")
+        result.require(style_kit.get("source_type") in ALLOWED_STYLE_SOURCES, "style_kit.source_type is invalid")
 
     asset_registry = contract.get("asset_registry")
     result.require(isinstance(asset_registry, list), "production_contract.asset_registry must be a list")
@@ -484,7 +486,26 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
     result.require(exists_nonempty(sample_dir / "sample_contract.json") or not is_sample_required(order_dir, result), "sample_required=true requires 04_sample/sample_contract.json")
     kit = load_json(style_kit / "style_kit.json", result, "04_sample/style_kit/style_kit.json")
     if kit:
-        result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "style_kit.json approved_sample_paths must not be empty")
+        source = kit.get("source")
+        result.require(isinstance(source, dict), "style_kit.json source must be an object")
+        if isinstance(source, dict):
+            source_type = source.get("source_type")
+            result.require(source_type in ALLOWED_STYLE_SOURCES, "style_kit.json source_type is invalid")
+            result.require(is_nonempty_collection(source.get("source_paths")), "style_kit.json source_paths must not be empty")
+            result.require(not is_empty_value(source.get("approval_id")), "style_kit.json source approval_id is required")
+            for source_path in path_list(source.get("source_paths")):
+                result.require(rel_path_exists(order_dir, source_path), f"style_kit source path does not exist: {source_path}")
+            if source.get("approval_id"):
+                result.require(str(source["approval_id"]) in approval_ids(order_dir, result), "style_kit source approval_id is not approved")
+            if is_sample_required(order_dir, result):
+                result.require(source_type == "approved_sample", "sample-required order must use approved_sample style source")
+                result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "approved_sample style source requires approved_sample_paths")
+            else:
+                result.require(source_type in ALLOWED_STYLE_SOURCES - {"approved_sample"}, "direct production must use a non-sample style source")
+            contract = load_production_contract(order_dir, result)
+            contract_style = contract.get("style_kit") if contract else None
+            contract_source = contract_style.get("source_type") if isinstance(contract_style, dict) else None
+            result.require(source_type == contract_source, "style_kit source_type must match production contract")
         family_refs = kit.get("page_family_refs")
         result.require(isinstance(family_refs, dict) and bool(family_refs), "style_kit.json page_family_refs must not be empty")
     for rel_path in [

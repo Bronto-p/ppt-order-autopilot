@@ -160,7 +160,11 @@ class ValidateOrderTests(unittest.TestCase):
                 "same_backend_as_sample": True,
                 "forbidden_methods": ["html_css_render", "svg_render", "pillow_slide", "manual_overlay", "python_pptx_native_layout"],
             },
-            "style_kit": {"required": True, "path": "04_sample/style_kit/style_kit.json"},
+            "style_kit": {
+                "required": True,
+                "path": "04_sample/style_kit/style_kit.json",
+                "source_type": "approved_style_brief",
+            },
             "asset_registry": [],
             "slides": [slide],
             "coverage_matrix": [
@@ -178,7 +182,12 @@ class ValidateOrderTests(unittest.TestCase):
         write_json(
             style_dir / "style_kit.json",
             {
-                "approved_sample_paths": ["04_sample/sample_preview_images/sample_01.png"],
+                "source": {
+                    "source_type": "approved_style_brief",
+                    "source_paths": ["03_requirements/requirements.json"],
+                    "approval_id": "appr_test",
+                },
+                "approved_sample_paths": [],
                 "style_anchor": "04_sample/style_kit/style_anchor.png",
                 "template_master": "04_sample/style_kit/template_master.png",
                 "navigation_bar": None,
@@ -316,6 +325,28 @@ class ValidateOrderTests(unittest.TestCase):
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "contract_accuracy")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("slide 1 missing job_path", result.stdout)
+
+    def test_direct_production_accepts_approved_style_brief(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_sample_required_rejects_non_sample_style_source(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        requirements_path = order_dir / "03_requirements" / "requirements.json"
+        requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        requirements["sample_required"]["value"] = True
+        write_json(requirements_path, requirements)
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        write_json(order_dir / "04_sample" / "sample_contract.json", {})
+        self.add_style_kit(order_dir)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sample-required order must use approved_sample style source", result.stdout)
 
     def test_slide_jobs_reject_empty_exact_content(self) -> None:
         order_dir = self.prepare_order_through_production()

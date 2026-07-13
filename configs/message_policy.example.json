@@ -14,6 +14,16 @@
   "require_pre_send_screenshot": true,
   "require_post_send_screenshot": true,
   "business_send_two_phase_commit": true,
+  "file_send": {
+    "enabled": false,
+    "require_manifest": true,
+    "require_local_hash_recheck": true,
+    "allowed_approval_actions": [
+      "send_sample",
+      "send_final_delivery",
+      "send_revision_response"
+    ]
+  },
   "owner_approval_required_for": [
     "accept_order",
     "reject_order",

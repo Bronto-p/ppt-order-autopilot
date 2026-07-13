@@ -1,6 +1,6 @@
 # Style Master And Sample Policy
 
-Samples are not only for client approval. Approved samples create the visual anchors that make final production consistent.
+Samples are one source of visual anchors, not a universal gate. Every production path needs a style kit, but direct production may build it from a customer template, source deck, or owner-approved style brief.
 
 ## Required Style Master
 
@@ -31,5 +31,14 @@ Samples are not only for client approval. Approved samples create the visual anc
 
 `approved_sample_reference.json` must connect approved sample images to page families and production matching rules.
 
-Final slides must reference approved sample/style master images; “按样稿风格做” as text is not enough.
+Final slides must reference approved sample/style kit images; “按样稿风格做” as text is not enough.
 
+## Direct Production
+
+When `sample_required=false`, the style kit records one explicit source type:
+
+- `customer_template`
+- `source_deck`
+- `approved_style_brief`
+
+It must still contain `style_anchor.png`, `template_master.png`, page-family references, locked elements, source paths, and the approval ID. Skipping customer-facing samples never permits skipping the internal visual system.

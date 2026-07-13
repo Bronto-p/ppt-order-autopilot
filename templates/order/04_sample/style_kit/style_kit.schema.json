@@ -3,6 +3,7 @@
   "title": "Style Kit",
   "type": "object",
   "required": [
+    "source",
     "approved_sample_paths",
     "style_anchor",
     "template_master",
@@ -11,9 +12,40 @@
     "must_match"
   ],
   "properties": {
+    "source": {
+      "type": "object",
+      "required": [
+        "source_type",
+        "source_paths",
+        "approval_id"
+      ],
+      "properties": {
+        "source_type": {
+          "enum": [
+            "approved_sample",
+            "customer_template",
+            "source_deck",
+            "approved_style_brief"
+          ]
+        },
+        "source_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "approved_sample_paths": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "string",
         "minLength": 1
@@ -62,6 +94,27 @@
       "uniqueItems": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "source_type": {
+                "const": "approved_sample"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "approved_sample_paths": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }
-
