@@ -23,6 +23,7 @@
           "prompt_file",
           "input_images_dir",
           "render_result_file",
+          "finalization_file",
           "output_image"
         ],
         "properties": {
@@ -53,6 +54,10 @@
           "render_result_file": {
             "type": "string",
             "pattern": "^05_production/slide_jobs/slide_\\d{2,}/render_result\\.json$"
+          },
+          "finalization_file": {
+            "type": "string",
+            "pattern": "^05_production/slide_jobs/slide_\\d{2,}/finalization\\.json$"
           },
           "output_image": {
             "type": "string",

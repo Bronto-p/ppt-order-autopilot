@@ -16,6 +16,7 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 - `04_sample/style_kit/*`
 - `05_production/slide_jobs/slide_jobs.json`
 - `05_production/slide_run_state.json`
+- `05_production/slide_jobs/slide_XX/finalization.json`
 - `05_production/origin_image/*.png`
 
 ## Outputs
@@ -33,7 +34,7 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 - Strict assets were not redrawn as lookalikes.
 - Style matches `style_anchor.png`.
 - Template and title hierarchy match `template_master.png`.
-- Navigation geometry matches `navigation_bar.png`.
+- Navigation geometry is an exact pixel match to the locked overlay; `medium` is not a passing result.
 - Active section highlight is correct.
 - Locked logo/footer/page-number regions stay stable.
 - Chinese text is readable.
@@ -45,3 +46,5 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 2. Any worker blocker blocks assembly.
 3. Navigation mismatch blocks pages that require navigation.
 4. `visual_qa_result.json` must be `pass` before final QA can pass.
+5. 有 locked chrome 的页必须先验证 `finalization.json`：overlay hash 正确、safe zone 无不透明像素、opaque pixels 在最终图中精确保留。
+6. 导航不一致属于 finalization/packaging 错误，优先重新合成，不消耗生图重试次数。

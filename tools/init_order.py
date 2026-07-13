@@ -10,16 +10,11 @@ import shutil
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from bootstrap_runtime import bootstrap_runtime
+
 
 TZ_SHANGHAI = timezone(timedelta(hours=8))
 ORDER_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{3}(?:_[A-Za-z0-9-]+)?$")
-GLOBAL_LEDGER_FILES = [
-    "orders.jsonl",
-    "sent_messages.jsonl",
-    "ui_actions.jsonl",
-    "approvals.jsonl",
-]
-
 ORDER_SUBDIRS = [
     "00_state",
     "01_chat/screenshots",
@@ -81,13 +76,6 @@ def append_jsonl(path: Path, payload: dict) -> None:
         file.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def init_global_ledgers(project_root: Path) -> None:
-    ledgers_root = project_root / "ledgers"
-    ledgers_root.mkdir(parents=True, exist_ok=True)
-    for name in GLOBAL_LEDGER_FILES:
-        (ledgers_root / name).touch(exist_ok=True)
-
-
 def template_target_name(path: Path) -> str:
     name = path.name
     return name.replace(".template.", ".")
@@ -114,7 +102,7 @@ def create_order(args: argparse.Namespace) -> Path:
     if not orders_root.is_relative_to(project_root):
         raise SystemExit(f"orders_root must stay inside project root: {project_root}")
     orders_root.mkdir(parents=True, exist_ok=True)
-    init_global_ledgers(project_root)
+    bootstrap_runtime(project_root)
 
     now = datetime.now(TZ_SHANGHAI)
     date_prefix = now.strftime("%Y-%m-%d")
@@ -137,6 +125,7 @@ def create_order(args: argparse.Namespace) -> Path:
         "state_version": 1,
         "order_id": order_id,
         "state": "IDLE",
+        "previous_state": None,
         "current_gate": "base",
         "fixed_contact": args.contact,
         "last_action": "order_folder_created",

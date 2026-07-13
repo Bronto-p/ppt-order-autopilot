@@ -50,6 +50,7 @@ Each `job.json` must include:
 - template master.
 - page family reference.
 - navigation bar image when the slide uses navigation.
+- `locked_chrome` mode, variant ID, active navigation section, transparent overlay path/hash, and a content safe box whenever fixed navigation/logo/footer/page number is required.
 - strict client assets assigned to that slide.
 - worker reasoning level.
 - selected backend and mode.
@@ -64,3 +65,5 @@ Each `job.json` must include:
 4. Pages with strict assets, navigation, data, old PPT references, timeline, process, cover, or sample roles must use `high`.
 5. Subagents must not read raw attachments, chat logs, order brief, or full production contract.
 6. `job.json` and each dispatched attempt snapshot are immutable; repair attempts use a separate repair job.
+7. 固定 chrome 不交给生图模型重画。Packager 必须从 style-kit registry 按 `slide_no` 选择唯一 variant，原样复制为本页 `locked_chrome.png`，并保留 source path/hash、active section 和 `page_number_text`。不允许为 bundle 重新导出 overlay。
+8. worker 必须在完整画布上生成主体，避开 `content_safe_box` 之外的 chrome 区域，不自行绘制导航、logo、页脚或页码。

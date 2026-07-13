@@ -3,7 +3,8 @@
   "title": "Style Kit Locked Elements",
   "type": "object",
   "required": [
-    "canvas"
+    "canvas",
+    "render_strategy"
   ],
   "properties": {
     "canvas": {
@@ -24,6 +25,98 @@
       },
       "additionalProperties": false
     },
+    "render_strategy": {
+      "enum": [
+        "reference_only",
+        "post_generation_composite"
+      ]
+    },
+    "content_safe_box": {
+      "$ref": "#/$defs/box"
+    },
+    "overlay_variants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "variant_id",
+          "slide_no",
+          "page_number_text",
+          "dynamic_region_ids",
+          "source_path",
+          "sha256"
+        ],
+        "properties": {
+          "variant_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slide_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_number_text": {
+            "type": ["string", "null"]
+          },
+          "dynamic_region_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"},
+            "uniqueItems": true
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "active_navigation_section": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "invariant_skeleton": {
+      "type": "object",
+      "required": ["source_path", "sha256"],
+      "properties": {
+        "source_path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "dynamic_regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["region_id", "role", "x", "y", "w", "h"],
+        "properties": {
+          "region_id": {"type": "string", "minLength": 1},
+          "role": {"enum": ["active_highlight", "page_number"]},
+          "x": {"type": "integer", "minimum": 0},
+          "y": {"type": "integer", "minimum": 0},
+          "w": {"type": "integer", "minimum": 1},
+          "h": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "page_number_policy": {
+      "type": "object",
+      "required": ["mode", "total_slides", "custom_values"],
+      "properties": {
+        "mode": {"enum": ["none", "plain", "zero_padded_2", "current_over_total", "custom"]},
+        "total_slides": {"type": ["integer", "null"], "minimum": 1},
+        "custom_values": {"type": ["object", "null"], "additionalProperties": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
     "logo": {
       "$ref": "#/$defs/locked_box"
     },
@@ -38,6 +131,22 @@
     }
   },
   "$defs": {
+    "box": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "properties": {
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0},
+        "w": {"type": "integer", "minimum": 1},
+        "h": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
     "locked_box": {
       "type": "object",
       "required": [
@@ -68,6 +177,33 @@
       "additionalProperties": false
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "render_strategy": {
+            "const": "post_generation_composite"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "content_safe_box",
+          "overlay_variants",
+          "invariant_skeleton",
+          "dynamic_regions",
+          "page_number_policy"
+        ],
+        "properties": {
+          "overlay_variants": {
+            "minItems": 1
+          },
+          "dynamic_regions": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }
-

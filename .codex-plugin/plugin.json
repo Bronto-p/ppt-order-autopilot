@@ -1,0 +1,24 @@
+{
+  "name": "ppt-order-autopilot",
+  "version": "0.2.0",
+  "description": "Agent-native PPT order intake, production, QA, delivery, and recovery workflow for Codex.",
+  "author": {
+    "name": "Bronto-p"
+  },
+  "repository": "https://github.com/Bronto-p/ppt-order-autopilot",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "PPT Order Autopilot",
+    "shortDescription": "Run PPT orders from intake through delivery gates",
+    "longDescription": "A progressive-disclosure Codex plugin for WeCom or attachment intake, owner approval gates, one-slide-per-subagent image production, deterministic locked chrome, QA, recovery, and delivery.",
+    "developerName": "Bronto-p",
+    "category": "Productivity",
+    "capabilities": [
+      "Computer Use",
+      "Image Generation",
+      "Subagents",
+      "Automations"
+    ],
+    "defaultPrompt": "Run or resume PPT Order Autopilot from durable state. Reconcile side effects first, load only the current stage skill, and continue until an owner gate, hard blocker, or closeout."
+  }
+}

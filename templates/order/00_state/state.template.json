@@ -2,6 +2,7 @@
   "state_version": 1,
   "order_id": "REPLACE_ME",
   "state": "IDLE",
+  "previous_state": null,
   "current_gate": "base",
   "fixed_contact": null,
   "last_action": null,

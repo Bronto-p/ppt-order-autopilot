@@ -8,6 +8,9 @@
     "active_contact_id",
     "active_inquiry_id",
     "active_order_id",
+    "pending_order_ids",
+    "waiting_order_ids",
+    "automation_binding",
     "updated_at",
     "blocked_reason"
   ],
@@ -36,6 +39,30 @@
     },
     "active_order_id": {
       "type": ["string", "null"]
+    },
+    "pending_order_ids": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "waiting_order_ids": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "automation_binding": {
+      "type": ["object", "null"],
+      "required": ["status", "deterministic_name", "automation_id", "schedule_fingerprint", "schedule", "task_prompt", "updated_at"],
+      "properties": {
+        "status": {"enum": ["pending", "active"]},
+        "deterministic_name": {"type": "string", "minLength": 1},
+        "automation_id": {"type": ["string", "null"]},
+        "schedule_fingerprint": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "schedule": {"type": "string", "minLength": 1},
+        "task_prompt": {"type": "string", "minLength": 1},
+        "updated_at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": false
     },
     "last_scheduled_ask_at": {
       "type": ["string", "null"],

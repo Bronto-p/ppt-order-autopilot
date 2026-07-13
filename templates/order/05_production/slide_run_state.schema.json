@@ -26,12 +26,14 @@
           "bundle_dir",
           "job_file",
           "render_result_file",
+          "finalization_file",
           "status",
           "current_attempt",
           "max_attempts",
           "accepted_attempt",
           "attempts",
           "selected_source",
+          "final_output_image",
           "backend_used",
           "input_images_seen",
           "blockers"
@@ -56,6 +58,12 @@
           "render_result_file": {
             "type": "string",
             "pattern": "^05_production/slide_jobs/slide_\\d{2,}/render_result\\.json$"
+          },
+          "finalization_file": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "enum": [
@@ -147,6 +155,12 @@
             }
           },
           "selected_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "final_output_image": {
             "type": [
               "string",
               "null"

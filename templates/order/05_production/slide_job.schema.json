@@ -150,7 +150,8 @@
       "type": "object",
       "required": [
         "must_match_style_anchor",
-        "use_navigation_bar"
+        "use_navigation_bar",
+        "locked_chrome"
       ],
       "properties": {
         "must_match_style_anchor": {
@@ -170,6 +171,148 @@
             "string",
             "null"
           ]
+        },
+        "locked_chrome": {
+          "type": "object",
+          "required": [
+            "mode",
+            "variant_id",
+            "active_navigation_section",
+            "page_number_text",
+            "style_variant_path",
+            "style_variant_sha256",
+            "overlay_bundle_path",
+            "overlay_sha256",
+            "content_safe_box"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "none",
+                "post_generation_composite"
+              ]
+            },
+            "variant_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "active_navigation_section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "page_number_text": {
+              "type": ["string", "null"]
+            },
+            "style_variant_path": {
+              "type": ["string", "null"],
+              "pattern": "^04_sample/style_kit/.+"
+            },
+            "style_variant_sha256": {
+              "type": ["string", "null"],
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "overlay_bundle_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^input_images/.+"
+            },
+            "overlay_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "content_safe_box": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "required": [
+                "x",
+                "y",
+                "w",
+                "h"
+              ],
+              "properties": {
+                "x": {"type": "integer", "minimum": 0},
+                "y": {"type": "integer", "minimum": 0},
+                "w": {"type": "integer", "minimum": 1},
+                "h": {"type": "integer", "minimum": 1}
+              },
+              "additionalProperties": false
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "post_generation_composite"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "overlay_bundle_path": {
+                    "type": "string"
+                  },
+                  "variant_id": {
+                    "type": "string"
+                  },
+                  "style_variant_path": {
+                    "type": "string"
+                  },
+                  "style_variant_sha256": {
+                    "type": "string"
+                  },
+                  "overlay_sha256": {
+                    "type": "string"
+                  },
+                  "content_safe_box": {
+                    "type": "object"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "overlay_bundle_path": {
+                    "type": "null"
+                  },
+                  "variant_id": {
+                    "type": "null"
+                  },
+                  "active_navigation_section": {
+                    "type": "null"
+                  },
+                  "page_number_text": {
+                    "type": "null"
+                  },
+                  "style_variant_path": {
+                    "type": "null"
+                  },
+                  "style_variant_sha256": {
+                    "type": "null"
+                  },
+                  "overlay_sha256": {
+                    "type": "null"
+                  },
+                  "content_safe_box": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ],
+          "additionalProperties": false
         }
       },
       "additionalProperties": true
