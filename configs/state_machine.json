@@ -292,6 +292,7 @@
       ],
       "required_artifacts": [
         "04_sample/sample_delivery_message.md",
+        "04_sample/sample_send_manifest.json",
         "00_state/approvals.jsonl"
       ],
       "requires_owner_approval": true
@@ -302,7 +303,10 @@
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
-        "03_requirements/production_contract.json"
+        "03_requirements/production_contract.json",
+        "04_sample/style_kit/style_kit.json",
+        "04_sample/style_kit/style_anchor.png",
+        "04_sample/style_kit/template_master.png"
       ],
       "requires_owner_approval": false
     },
@@ -324,7 +328,8 @@
       ],
       "required_artifacts": [
         "06_qa/qa_result.json",
-        "07_delivery/delivery_message.md"
+        "07_delivery/delivery_message.md",
+        "07_delivery/final_send_manifest.json"
       ],
       "requires_owner_approval": false
     },
@@ -336,6 +341,7 @@
       ],
       "required_artifacts": [
         "07_delivery/delivery_message.md",
+        "07_delivery/final_send_manifest.json",
         "00_state/approvals.jsonl"
       ],
       "requires_owner_approval": true

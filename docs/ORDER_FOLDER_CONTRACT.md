@@ -50,6 +50,7 @@ orders/{order_id}_{topic}/
 │   └── qa_result.json
 ├── 07_delivery/
 │   ├── delivery_message.md
+│   ├── final_send_manifest.json
 │   ├── revision_request.json
 │   ├── revision_decision.md
 │   └── revision_quote_or_scope.md

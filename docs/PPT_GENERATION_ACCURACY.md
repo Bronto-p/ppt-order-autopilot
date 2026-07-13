@@ -14,6 +14,7 @@ PPT 生产层的目标不是“能生成一套 PPT”，而是让每一页 subag
 8. 有导航条、固定页脚、栏目标签时，必须有单独 reference image 和 locked element 规则。
 9. subagent reasoning 默认 high，low 禁止用于客户生产。
 10. required image 无法传入生图 backend 时，必须 blocker，不能 text-only fallback。
+11. `sample_required=false` 只跳过客户样稿，不跳过 style kit；style kit 必须来自客户模板、源 PPT 或已批准 style brief。
 
 ## Production Flow
 

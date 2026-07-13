@@ -120,6 +120,8 @@ owner delivery approval
 
 即使 QA 通过，也只生成交付话术，不能自动发送。
 
+owner 批准 `send_sample` 或 `send_final_delivery` 后，由 `wecom-computer-use-operator` 按不可变 file-send manifest 附加并发送文件；生产和 QA skill 本身仍不直接操作企业微信。
+
 ## 4. 核心账本
 
 全局账本放在 `ledgers/`：
