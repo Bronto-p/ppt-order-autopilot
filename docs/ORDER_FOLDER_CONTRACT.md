@@ -33,10 +33,11 @@ orders/{order_id}_{topic}/
 ├── 04_sample/
 │   ├── sample_contract.json
 │   ├── approved_sample_reference.json
-│   └── style_master/
+│   └── style_kit/
+│       ├── style_kit.json
 │       ├── style_anchor.png
 │       ├── template_master.png
-│       ├── style_spec.json
+│       ├── navigation_bar.png
 │       └── locked_elements.json
 ├── 05_production/
 │   ├── production_blueprint.json
@@ -49,6 +50,7 @@ orders/{order_id}_{topic}/
 │   └── qa_result.json
 ├── 07_delivery/
 │   ├── delivery_message.md
+│   ├── final_send_manifest.json
 │   ├── revision_request.json
 │   ├── revision_decision.md
 │   └── revision_quote_or_scope.md

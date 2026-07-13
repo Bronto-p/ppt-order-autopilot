@@ -140,14 +140,15 @@
 
 职责：
 
-- 读取样稿产物和 approval。
-- 生成 `approved_sample_reference.json`。
-- 生成 `04_sample/style_master/*` 图像锚点和 JSON 规则。
+- 读取 production contract、素材索引、可选样稿产物和 approval。
+- 有样稿时生成 `approved_sample_reference.json`；直接生产时记录客户模板、源 deck 或已批准 style brief。
+- 生成 `04_sample/style_kit/*` 图像锚点和 JSON 规则。
 
 硬规则：
 
-- 没有 approved sample，不生成 style master。
-- style master 必须包含图像参考和 locked element 规则。
+- 样稿订单没有 approved sample 时不生成 style kit。
+- 直接生产也必须有已批准的真实 style source。
+- style kit 必须包含图像参考和 locked element 规则。
 
 ## 9. ppt-slide-job-packager
 

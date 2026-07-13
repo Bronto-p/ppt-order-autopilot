@@ -32,6 +32,7 @@ description: "PPT 生产契约构建层。把已确认的 requirements、decisio
 - `deck.requirements_source`
 - `method`
 - `style_kit`
+- `style_kit.source_type`
 - `asset_registry`
 - `slides[].slide_no`
 - `slides[].page_type`
@@ -52,3 +53,4 @@ description: "PPT 生产契约构建层。把已确认的 requirements、decisio
 6. 每个 strict client asset 必须分配到具体 slide。
 7. `production_contract.json` 只保存总契约和每页 `job_path`，不内嵌完整执行包。
 8. 每页执行材料由 `ppt-slide-job-packager` 写入 `05_production/slide_jobs/slide_XX/`。
+9. 有样稿时 `style_kit.source_type=approved_sample`；直接生产时必须明确记录客户模板、源 deck 或已批准 style brief，不能留下隐式默认。

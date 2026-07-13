@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -24,6 +25,10 @@ def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def sha256_text(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class ValidateOrderTests(unittest.TestCase):
@@ -53,6 +58,9 @@ class ValidateOrderTests(unittest.TestCase):
 
     def prepare_order_through_production(self) -> Path:
         order_dir = self.create_order()
+        order_id = json.loads((order_dir / "00_state" / "state.json").read_text(encoding="utf-8"))["order_id"]
+        draft_message = "我接这个单"
+        draft_sha256 = sha256_text(draft_message)
         write_json(
             order_dir / "01_chat" / "coverage_result.json",
             {
@@ -108,10 +116,10 @@ class ValidateOrderTests(unittest.TestCase):
             {
                 "approval_id": "appr_test",
                 "action_type": "accept_order",
-                "order_id": "2026-07-06_001",
+                "order_id": order_id,
                 "contact_id": "cs_a",
-                "draft_message": "我接这个单",
-                "draft_sha256": "sha256:" + "a" * 64,
+                "draft_message": draft_message,
+                "draft_sha256": draft_sha256,
                 "created_at": "2026-07-06T10:02:00+08:00",
                 "status": "approved",
             },
@@ -120,10 +128,10 @@ class ValidateOrderTests(unittest.TestCase):
             json.dumps(
                 {
                     "approval_id": "appr_test",
-                    "order_id": "2026-07-06_001",
+                    "order_id": order_id,
                     "action_type": "accept_order",
                     "contact_id": "cs_a",
-                    "draft_sha256": "sha256:" + "a" * 64,
+                    "draft_sha256": draft_sha256,
                     "status": "approved",
                     "created_at": "2026-07-06T10:02:00+08:00",
                     "approved_at": "2026-07-06T10:03:00+08:00",
@@ -160,7 +168,11 @@ class ValidateOrderTests(unittest.TestCase):
                 "same_backend_as_sample": True,
                 "forbidden_methods": ["html_css_render", "svg_render", "pillow_slide", "manual_overlay", "python_pptx_native_layout"],
             },
-            "style_kit": {"required": True, "path": "04_sample/style_kit/style_kit.json"},
+            "style_kit": {
+                "required": True,
+                "path": "04_sample/style_kit/style_kit.json",
+                "source_type": "approved_style_brief",
+            },
             "asset_registry": [],
             "slides": [slide],
             "coverage_matrix": [
@@ -178,7 +190,12 @@ class ValidateOrderTests(unittest.TestCase):
         write_json(
             style_dir / "style_kit.json",
             {
-                "approved_sample_paths": ["04_sample/sample_preview_images/sample_01.png"],
+                "source": {
+                    "source_type": "approved_style_brief",
+                    "source_paths": ["03_requirements/requirements.json"],
+                    "approval_id": "appr_test",
+                },
+                "approved_sample_paths": [],
                 "style_anchor": "04_sample/style_kit/style_anchor.png",
                 "template_master": "04_sample/style_kit/template_master.png",
                 "navigation_bar": None,
@@ -334,6 +351,63 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("topic is required but evidence is empty", result.stdout)
 
+    def test_required_empty_collection_fails_briefing(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        requirements_path = order_dir / "03_requirements" / "requirements.json"
+        requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        requirements["content_materials"] = {
+            "value": [],
+            "evidence": "客户说稍后提供材料",
+            "confidence": "high",
+            "required": True,
+        }
+        write_json(requirements_path, requirements)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "briefing")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("content_materials is required but value is empty", result.stdout)
+
+    def test_pending_approval_hash_must_match_message(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        pending_path = order_dir / "03_requirements" / "pending_approval.json"
+        pending = json.loads(pending_path.read_text(encoding="utf-8"))
+        pending["draft_sha256"] = "sha256:" + "b" * 64
+        write_json(pending_path, pending)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "decision")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("draft_sha256 does not match draft_message", result.stdout)
+
+    def test_approval_from_another_order_cannot_authorize_production(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        approvals_path = order_dir / "00_state" / "approvals.jsonl"
+        approval = json.loads(approvals_path.read_text(encoding="utf-8"))
+        approval["order_id"] = "2026-07-06_999"
+        approvals_path.write_text(json.dumps(approval, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "production")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("production approval_id not approved for production", result.stdout)
+
+    def test_attachment_path_cannot_escape_order_folder(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        attachment = {
+            "attachment_id": "att_escape",
+            "saved_path": "../../outside.png",
+            "source_message_id": "msg_001",
+            "sha256": "sha256:" + "a" * 64,
+            "download_status": "success",
+        }
+        (order_dir / "02_attachments_raw" / "attachment_index.jsonl").write_text(
+            json.dumps(attachment, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "chat_capture")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("saved_path must stay inside", result.stdout)
+
     def test_contract_accuracy_rejects_missing_job_path(self) -> None:
         order_dir = self.prepare_order_through_production()
         write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract(include_job_path=False))
@@ -341,6 +415,28 @@ class ValidateOrderTests(unittest.TestCase):
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "contract_accuracy")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("slide 1 missing job_path", result.stdout)
+
+    def test_direct_production_accepts_approved_style_brief(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        self.add_style_kit(order_dir)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_sample_required_rejects_non_sample_style_source(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        requirements_path = order_dir / "03_requirements" / "requirements.json"
+        requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        requirements["sample_required"]["value"] = True
+        write_json(requirements_path, requirements)
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        write_json(order_dir / "04_sample" / "sample_contract.json", {})
+        self.add_style_kit(order_dir)
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sample-required order must use approved_sample style source", result.stdout)
 
     def test_slide_jobs_reject_empty_exact_content(self) -> None:
         order_dir = self.prepare_order_through_production()

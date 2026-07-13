@@ -1,0 +1,15 @@
+{
+  "state_version": 1,
+  "inquiry_id": null,
+  "contact_id": null,
+  "state": "PREPARED",
+  "ask_message_hash": null,
+  "sent_message_ledger_id": null,
+  "sent_at": null,
+  "completed_reply_checks_minutes": [],
+  "next_reply_check_at": null,
+  "reply_detected_at": null,
+  "promoted_order_ids": [],
+  "updated_at": null,
+  "blocked_reason": null
+}

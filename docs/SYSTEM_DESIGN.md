@@ -62,6 +62,8 @@ owner delivery approval
 
 `ppt-business-orchestrator` 是总控。它只读写订单状态和账本，决定下一步应该调用哪个 skill。
 
+订单出现前，它使用全局 automation state 和 `inbox/{inquiry_id}/` 管理询单、回复检查和临时下载；识别订单后才创建正式订单目录。这样不要求用户预先整理客户材料，也不需要用未知标题创建假订单。
+
 它不直接操作企业微信，不直接做 PPT，也不直接发送业务消息。
 
 ### UI Adapter
@@ -117,6 +119,8 @@ owner delivery approval
 `ppt-qa-delivery` 是质检和交付层。它检查 PPT、PDF、需求覆盖、附件使用、页数、错别字、导出结果和交付文件名。
 
 即使 QA 通过，也只生成交付话术，不能自动发送。
+
+owner 批准 `send_sample` 或 `send_final_delivery` 后，由 `wecom-computer-use-operator` 按不可变 file-send manifest 附加并发送文件；生产和 QA skill 本身仍不直接操作企业微信。
 
 ## 4. 核心账本
 

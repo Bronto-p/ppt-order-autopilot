@@ -13,8 +13,8 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 
 - `03_requirements/production_contract.json`
 - `04_sample/approved_sample_reference.json`
-- `04_sample/style_master/*`
-- `05_production/slide_jobs.json`
+- `04_sample/style_kit/*`
+- `05_production/slide_jobs/slide_jobs.json`
 - `05_production/slide_run_state.json`
 - `05_production/origin_image/*.png`
 

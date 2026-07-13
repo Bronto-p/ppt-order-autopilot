@@ -15,6 +15,7 @@ ALLOWED_REQUIREMENT_CONFIDENCE = {"high", "medium", "low", "inferred", "missing"
 ALLOWED_ATTACHMENT_STATUS = {"success", "failed", "skipped"}
 ALLOWED_QA_STATUS = {"pass", "blocked", "failed"}
 ALLOWED_WORKER_REASONING = {"medium", "high"}
+ALLOWED_STYLE_SOURCES = {"approved_sample", "customer_template", "source_deck", "approved_style_brief"}
 STYLE_ANCHOR_ROLES = {"approved_sample_style_anchor", "style_anchor"}
 TEMPLATE_ROLES = {"template_reference", "template_master"}
 PAGE_FAMILY_ROLES = {"page_family_reference", "cover_reference", "section_reference", "content_reference", "data_reference", "image_heavy_reference"}
@@ -52,6 +53,8 @@ def is_empty_value(value: Any) -> bool:
         return True
     if isinstance(value, str):
         return value.strip() == ""
+    if isinstance(value, (list, tuple, set, dict)):
+        return not value
     return False
 
 
@@ -69,8 +72,31 @@ def has_deep_content(value: Any) -> bool:
     return not is_empty_value(value)
 
 
+def resolve_within(root: Path, rel_path: Any) -> Path | None:
+    """Resolve a runtime path without allowing absolute paths or parent escapes."""
+    if not isinstance(rel_path, str) or not rel_path.strip():
+        return None
+    candidate = Path(rel_path)
+    if candidate.is_absolute():
+        return None
+    root = root.resolve()
+    resolved = (root / candidate).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        return None
+    return resolved
+
+
+def safe_runtime_path(root: Path, rel_path: Any, result: ValidationResult, label: str) -> Path | None:
+    path = resolve_within(root, rel_path)
+    result.require(path is not None, f"{label} must stay inside {root}")
+    return path
+
+
 def rel_path_exists(order_dir: Path, rel_path: Any) -> bool:
-    return isinstance(rel_path, str) and (order_dir / rel_path).exists()
+    path = resolve_within(order_dir, rel_path)
+    return path is not None and path.exists()
 
 
 def path_list(value: Any) -> list[str]:
@@ -130,14 +156,35 @@ def load_state_machine(result: ValidationResult) -> dict[str, Any] | None:
     return load_json(project_root() / "configs" / "state_machine.json", result, "configs/state_machine.json")
 
 
-def approval_ids(order_dir: Path, result: ValidationResult) -> set[str]:
+def order_id_from_state(order_dir: Path, result: ValidationResult) -> str | None:
+    state = load_json(order_dir / "00_state" / "state.json", result, "00_state/state.json")
+    if not state:
+        return None
+    order_id = state.get("order_id")
+    result.require(isinstance(order_id, str) and bool(order_id), "state.json order_id must be a non-empty string")
+    return order_id if isinstance(order_id, str) and order_id else None
+
+
+def approved_records(order_dir: Path, result: ValidationResult) -> list[dict[str, Any]]:
     local_records = load_jsonl(order_dir / "00_state" / "approvals.jsonl", result, "00_state/approvals.jsonl", False)
     global_path = project_root() / "ledgers" / "approvals.jsonl"
     global_records = load_jsonl(global_path, result, "ledgers/approvals.jsonl", False) if global_path.exists() else []
-    return {
-        str(record.get("approval_id"))
+    order_id = order_id_from_state(order_dir, result)
+    return [
+        record
         for record in [*local_records, *global_records]
-        if record.get("approval_id") and record.get("status") == "approved"
+        if record.get("approval_id")
+        and record.get("status") == "approved"
+        and order_id is not None
+        and record.get("order_id") == order_id
+    ]
+
+
+def approval_ids(order_dir: Path, result: ValidationResult, action_types: set[str] | None = None) -> set[str]:
+    return {
+        str(record["approval_id"])
+        for record in approved_records(order_dir, result)
+        if action_types is None or record.get("action_type") in action_types
     }
 
 
@@ -168,8 +215,9 @@ def check_state_machine(order_dir: Path, result: ValidationResult, state: dict[s
         for artifact in required_artifacts:
             if not isinstance(artifact, str) or artifact.startswith("ledgers/"):
                 continue
-            path = order_dir / artifact
-            result.require(path.exists(), f"state {current_state} requires missing artifact: {artifact}")
+            path = safe_runtime_path(order_dir, artifact, result, f"state {current_state} artifact {artifact}")
+            if path is not None:
+                result.require(path.exists(), f"state {current_state} requires missing artifact: {artifact}")
 
 
 def check_base(order_dir: Path, result: ValidationResult) -> None:
@@ -236,8 +284,9 @@ def check_attachment_index(order_dir: Path, result: ValidationResult) -> list[di
                 f"attachment_index.jsonl record {index} success attachment must have sha256:<64 hex>",
             )
             saved_path = record.get("saved_path")
-            if isinstance(saved_path, str):
-                result.require((order_dir / saved_path).exists(), f"attachment_index.jsonl record {index} saved_path does not exist: {saved_path}")
+            path = safe_runtime_path(order_dir, saved_path, result, f"attachment_index.jsonl record {index} saved_path")
+            if path is not None:
+                result.require(path.exists(), f"attachment_index.jsonl record {index} saved_path does not exist: {saved_path}")
     return records
 
 
@@ -292,12 +341,30 @@ def check_pending_approval(order_dir: Path, result: ValidationResult) -> dict[st
         return None
     for key in ["approval_id", "action_type", "draft_message", "draft_sha256", "status"]:
         result.require(key in pending, f"pending_approval.json missing {key}")
+    result.require(not is_empty_value(pending.get("draft_message")), "pending_approval.json draft_message must not be empty")
     result.require(pending.get("status") in {"pending", "approved", "rejected"}, "pending_approval.json status is invalid")
     draft_sha = pending.get("draft_sha256")
     result.require(
         isinstance(draft_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", draft_sha),
         "pending_approval.json draft_sha256 must be sha256:<64 hex>",
     )
+    draft_message = pending.get("draft_message")
+    if isinstance(draft_message, str) and isinstance(draft_sha, str):
+        result.require(sha256_text(draft_message) == draft_sha, "pending_approval.json draft_sha256 does not match draft_message")
+
+    order_id = order_id_from_state(order_dir, result)
+    result.require(pending.get("order_id") == order_id, "pending_approval.json order_id must match state.json")
+
+    if pending.get("status") == "approved":
+        matches = [
+            record
+            for record in approved_records(order_dir, result)
+            if record.get("approval_id") == pending.get("approval_id")
+        ]
+        result.require(bool(matches), "approved pending_approval.json has no matching order-scoped approval record")
+        for record in matches:
+            result.require(record.get("action_type") == pending.get("action_type"), "approval action_type does not match pending approval")
+            result.require(record.get("draft_sha256") == draft_sha, "approval draft_sha256 does not match pending approval")
     return pending
 
 
@@ -345,7 +412,10 @@ def deliverables_from_contract(order_dir: Path, result: ValidationResult) -> set
         approval_id = approval.get("approval_id")
         result.require(not is_empty_value(approval_id), "production_contract.json approval.approval_id is required")
         if approval_id:
-            result.require(str(approval_id) in approval_ids(order_dir, result), f"production approval_id not approved: {approval_id}")
+            result.require(
+                str(approval_id) in approval_ids(order_dir, result, {"accept_order", "approve_production"}),
+                f"production approval_id not approved for production: {approval_id}",
+            )
     return normalized
 
 
@@ -383,6 +453,10 @@ def sha256_file(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def sha256_text(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
     check_production(order_dir, result)
     contract = load_production_contract(order_dir, result)
@@ -408,6 +482,7 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
     if isinstance(style_kit, dict):
         result.require(style_kit.get("path") == "04_sample/style_kit/style_kit.json", "style_kit.path must point to 04_sample/style_kit/style_kit.json")
         result.require(isinstance(style_kit.get("required"), bool), "style_kit.required must be boolean")
+        result.require(style_kit.get("source_type") in ALLOWED_STYLE_SOURCES, "style_kit.source_type is invalid")
 
     asset_registry = contract.get("asset_registry")
     result.require(isinstance(asset_registry, list), "production_contract.asset_registry must be a list")
@@ -419,6 +494,14 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
                 continue
             for key in ["asset_id", "asset_role", "source_path", "fidelity_rule", "if_missing"]:
                 result.require(not is_empty_value(asset.get(key)), f"asset_registry record {index} missing {key}")
+            source_path = safe_runtime_path(
+                order_dir,
+                asset.get("source_path"),
+                result,
+                f"asset_registry record {index} source_path",
+            )
+            if source_path is not None and asset.get("if_missing") == "block":
+                result.require(source_path.exists(), f"asset_registry record {index} required source_path does not exist")
             if isinstance(asset.get("asset_id"), str):
                 registered_assets[asset["asset_id"]] = asset
 
@@ -443,6 +526,9 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
             label = f"slide {slide_no}"
         for key in ["title", "page_type", "exact_content_source", "job_path"]:
             result.require(not is_empty_value(slide.get(key)), f"{label} missing {key}")
+        content_source = safe_runtime_path(order_dir, slide.get("exact_content_source"), result, f"{label} exact_content_source")
+        if content_source is not None:
+            result.require(content_source.exists(), f"{label} exact_content_source does not exist")
         asset_ids = slide.get("required_asset_ids")
         result.require(isinstance(asset_ids, list), f"{label} required_asset_ids must be a list")
         if isinstance(asset_ids, list):
@@ -453,6 +539,7 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
         job_path = slide.get("job_path")
         if isinstance(job_path, str):
             result.require(job_path == f"05_production/slide_jobs/slide_{slide_no:02d}/job.json", f"{label} job_path must match slide bundle")
+            safe_runtime_path(order_dir, job_path, result, f"{label} job_path")
 
     coverage = contract.get("coverage_matrix")
     if coverage is not None:
@@ -484,7 +571,26 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
     result.require(exists_nonempty(sample_dir / "sample_contract.json") or not is_sample_required(order_dir, result), "sample_required=true requires 04_sample/sample_contract.json")
     kit = load_json(style_kit / "style_kit.json", result, "04_sample/style_kit/style_kit.json")
     if kit:
-        result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "style_kit.json approved_sample_paths must not be empty")
+        source = kit.get("source")
+        result.require(isinstance(source, dict), "style_kit.json source must be an object")
+        if isinstance(source, dict):
+            source_type = source.get("source_type")
+            result.require(source_type in ALLOWED_STYLE_SOURCES, "style_kit.json source_type is invalid")
+            result.require(is_nonempty_collection(source.get("source_paths")), "style_kit.json source_paths must not be empty")
+            result.require(not is_empty_value(source.get("approval_id")), "style_kit.json source approval_id is required")
+            for source_path in path_list(source.get("source_paths")):
+                result.require(rel_path_exists(order_dir, source_path), f"style_kit source path does not exist: {source_path}")
+            if source.get("approval_id"):
+                result.require(str(source["approval_id"]) in approval_ids(order_dir, result), "style_kit source approval_id is not approved")
+            if is_sample_required(order_dir, result):
+                result.require(source_type == "approved_sample", "sample-required order must use approved_sample style source")
+                result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "approved_sample style source requires approved_sample_paths")
+            else:
+                result.require(source_type in ALLOWED_STYLE_SOURCES - {"approved_sample"}, "direct production must use a non-sample style source")
+            contract = load_production_contract(order_dir, result)
+            contract_style = contract.get("style_kit") if contract else None
+            contract_source = contract_style.get("source_type") if isinstance(contract_style, dict) else None
+            result.require(source_type == contract_source, "style_kit source_type must match production contract")
         family_refs = kit.get("page_family_refs")
         result.require(isinstance(family_refs, dict) and bool(family_refs), "style_kit.json page_family_refs must not be empty")
     for rel_path in [
@@ -545,7 +651,7 @@ def check_slide_job_payload(
                 continue
             bundle_path = image.get("bundle_path")
             result.require(isinstance(bundle_path, str) and bundle_path.startswith("input_images/"), f"{rel_label} input image {image_index} invalid bundle_path")
-            image_path = bundle_dir / bundle_path if isinstance(bundle_path, str) else None
+            image_path = safe_runtime_path(bundle_dir, bundle_path, result, f"{rel_label} input image {image_index} bundle_path")
             if image_path:
                 result.require(image_path.exists(), f"{rel_label} input image {image_index} bundle file missing: {bundle_path}")
                 expected_sha = image.get("sha256")
@@ -602,12 +708,17 @@ def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
         result.require(isinstance(prompt_file, str) and prompt_file.endswith("/prompt.md"), f"slide_jobs.json record {index} invalid prompt_file")
         result.require(isinstance(input_images_dir, str) and input_images_dir.endswith("/input_images"), f"slide_jobs.json record {index} invalid input_images_dir")
         result.require(isinstance(output_image, str) and output_image.startswith("05_production/origin_image/"), f"slide_jobs.json record {index} invalid output_image")
-        if isinstance(prompt_file, str):
-            result.require(exists_nonempty(order_dir / prompt_file), f"slide_jobs.json record {index} missing prompt_file")
-        if isinstance(input_images_dir, str):
-            result.require((order_dir / input_images_dir).is_dir(), f"slide_jobs.json record {index} missing input_images_dir")
-        if isinstance(job_id, str) and isinstance(slide_no, int) and isinstance(job_file, str) and isinstance(bundle_dir, str):
-            check_slide_job_payload(order_dir, order_dir / job_file, result, job_id, slide_no, order_dir / bundle_dir)
+        prompt_path = safe_runtime_path(order_dir, prompt_file, result, f"slide_jobs.json record {index} prompt_file")
+        input_path = safe_runtime_path(order_dir, input_images_dir, result, f"slide_jobs.json record {index} input_images_dir")
+        job_path = safe_runtime_path(order_dir, job_file, result, f"slide_jobs.json record {index} job_file")
+        bundle_path = safe_runtime_path(order_dir, bundle_dir, result, f"slide_jobs.json record {index} bundle_dir")
+        safe_runtime_path(order_dir, output_image, result, f"slide_jobs.json record {index} output_image")
+        if prompt_path is not None:
+            result.require(exists_nonempty(prompt_path), f"slide_jobs.json record {index} missing prompt_file")
+        if input_path is not None:
+            result.require(input_path.is_dir(), f"slide_jobs.json record {index} missing input_images_dir")
+        if isinstance(job_id, str) and isinstance(slide_no, int) and job_path is not None and bundle_path is not None:
+            check_slide_job_payload(order_dir, job_path, result, job_id, slide_no, bundle_path)
 
 
 def check_slide_attempt_history(
@@ -696,7 +807,10 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         result.require(isinstance(result_file, str), f"slide {slide_no} missing render_result_file")
         if not isinstance(result_file, str):
             continue
-        render = load_json(order_dir / result_file, result, result_file)
+        render_path = safe_runtime_path(order_dir, result_file, result, f"slide {slide_no} render_result_file")
+        if render_path is None:
+            continue
+        render = load_json(render_path, result, result_file)
         if not render:
             continue
         result.require(render.get("job_id") == job_id, f"{result_file} job_id mismatch")
@@ -704,7 +818,8 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         result.require(render.get("slide_no") == slide_no, f"{result_file} slide_no mismatch")
         result.require(render.get("status") == "success", f"{result_file} status must be success")
         result.require(not render.get("blockers"), f"{result_file} blockers must be empty")
-        result.require(isinstance(output_image, str) and (order_dir / output_image).exists(), f"slide {slide_no} output image missing")
+        output_path = safe_runtime_path(order_dir, output_image, result, f"slide {slide_no} output_image")
+        result.require(output_path is not None and output_path.exists(), f"slide {slide_no} output image missing")
         result.require(render.get("output_image") == output_image, f"{result_file} output_image must match slide_jobs.json")
         result.require(is_nonempty_collection(render.get("input_images_seen")), f"{result_file} input_images_seen must not be empty")
         for fidelity in render.get("asset_fidelity", []):
@@ -796,7 +911,10 @@ def check_qa(order_dir: Path, result: ValidationResult) -> None:
 def check_delivery(order_dir: Path, result: ValidationResult) -> None:
     check_qa(order_dir, result)
     result.require(exists_nonempty(order_dir / "07_delivery" / "delivery_message.md"), "missing or empty 07_delivery/delivery_message.md")
-    result.require(approval_ids(order_dir, result), "missing approved approval record before delivery")
+    result.require(
+        approval_ids(order_dir, result, {"send_final_delivery"}),
+        "missing order-scoped send_final_delivery record before delivery",
+    )
 
 
 def check_file_manifest(order_dir: Path, result: ValidationResult, path: Path, label: str) -> None:
@@ -815,8 +933,11 @@ def check_file_manifest(order_dir: Path, result: ValidationResult, path: Path, l
         sha = file_record.get("sha256")
         result.require(isinstance(rel_path, str) and bool(rel_path), f"{label} file {index} missing path")
         result.require(isinstance(sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", sha), f"{label} file {index} invalid sha256")
-        if isinstance(rel_path, str) and (order_dir / rel_path).exists() and isinstance(sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", sha):
-            result.require(sha256_file(order_dir / rel_path) == sha, f"{label} file {index} sha256 mismatch")
+        file_path = safe_runtime_path(order_dir, rel_path, result, f"{label} file {index} path")
+        if file_path is not None:
+            result.require(file_path.exists(), f"{label} file {index} path does not exist")
+        if file_path is not None and file_path.exists() and isinstance(sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", sha):
+            result.require(sha256_file(file_path) == sha, f"{label} file {index} sha256 mismatch")
 
 
 def check_closeout(order_dir: Path, result: ValidationResult) -> None:

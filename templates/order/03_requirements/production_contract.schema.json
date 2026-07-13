@@ -98,7 +98,8 @@
       "type": "object",
       "required": [
         "required",
-        "path"
+        "path",
+        "source_type"
       ],
       "properties": {
         "required": {
@@ -106,6 +107,14 @@
         },
         "path": {
           "const": "04_sample/style_kit/style_kit.json"
+        },
+        "source_type": {
+          "enum": [
+            "approved_sample",
+            "customer_template",
+            "source_deck",
+            "approved_style_brief"
+          ]
         }
       },
       "additionalProperties": false
