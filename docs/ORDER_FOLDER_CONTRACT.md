@@ -32,6 +32,9 @@ orders/{order_id}_{topic}/
 │   └── production_contract.json
 ├── 04_sample/
 │   ├── sample_contract.json
+│   ├── sample_send_manifest.json
+│   ├── sample_send_receipt.json
+│   ├── customer_sample_decision.json
 │   ├── approved_sample_reference.json
 │   └── style_kit/
 │       ├── style_kit.json

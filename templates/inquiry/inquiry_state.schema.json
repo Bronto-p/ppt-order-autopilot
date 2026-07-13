@@ -1,13 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WeCom Inquiry State",
+  "title": "Inquiry State",
   "type": "object",
   "required": [
     "state_version",
     "inquiry_id",
+    "source_type",
     "contact_id",
     "state",
     "ask_message_hash",
+    "source_attachment_paths",
     "completed_reply_checks_minutes",
     "promoted_order_ids",
     "updated_at",
@@ -18,16 +20,28 @@
       "const": 1
     },
     "inquiry_id": {
-      "type": "string",
-      "minLength": 1
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_type": {
+      "enum": [
+        "wecom",
+        "codex_attachment",
+        null
+      ]
     },
     "contact_id": {
-      "type": "string",
-      "minLength": 1
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "state": {
       "enum": [
         "PREPARED",
+        "ATTACHMENTS_STAGED",
         "SENT",
         "WAITING_REPLY",
         "REPLY_DETECTED",
@@ -38,8 +52,19 @@
       ]
     },
     "ask_message_hash": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_attachment_paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
     },
     "sent_message_ledger_id": {
       "type": ["string", "null"]
@@ -79,5 +104,44 @@
       "type": ["string", "null"]
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source_type": {
+            "const": "codex_attachment"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_attachment_paths": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_type": {
+            "const": "wecom"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ask_message_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

@@ -29,7 +29,7 @@ Samples are one source of visual anchors, not a universal gate. Every production
 
 ## Approval Output
 
-`approved_sample_reference.json` must connect approved sample images to page families and production matching rules.
+`approved_sample_reference.json` must connect approved sample images to page families, production matching rules, and the evidence-backed `customer_sample_decision.json` that authorized continued production.
 
 Final slides must reference approved sample/style kit images; “按样稿风格做” as text is not enough.
 

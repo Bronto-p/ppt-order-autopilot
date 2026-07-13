@@ -239,9 +239,19 @@ def check_coverage(order_dir: Path, result: ValidationResult) -> None:
     if not coverage:
         return
     result.require(coverage.get("status") == "success", "coverage_result.json status must be success")
-    result.require(isinstance(coverage.get("screens_captured"), int) and coverage["screens_captured"] > 0, "coverage must capture at least one screen")
-    result.require(not is_empty_value(coverage.get("top_anchor")), "coverage_result.json missing top_anchor")
-    result.require(not is_empty_value(coverage.get("bottom_anchor")), "coverage_result.json missing bottom_anchor")
+    source_type = coverage.get("source_type", "wecom")
+    result.require(source_type in {"wecom", "codex_attachment"}, "coverage_result.json source_type is invalid")
+    if source_type == "codex_attachment":
+        result.require(
+            is_nonempty_collection(coverage.get("source_attachment_paths")),
+            "Codex attachment intake requires source_attachment_paths",
+        )
+        for source_path in path_list(coverage.get("source_attachment_paths")):
+            result.require(rel_path_exists(order_dir, source_path), f"Codex source attachment does not exist: {source_path}")
+    else:
+        result.require(isinstance(coverage.get("screens_captured"), int) and coverage["screens_captured"] > 0, "coverage must capture at least one screen")
+        result.require(not is_empty_value(coverage.get("top_anchor")), "coverage_result.json missing top_anchor")
+        result.require(not is_empty_value(coverage.get("bottom_anchor")), "coverage_result.json missing bottom_anchor")
     overlap = coverage.get("adjacent_overlap_checks")
     if isinstance(overlap, dict):
         passed = overlap.get("passed")
@@ -577,16 +587,45 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
             source_type = source.get("source_type")
             result.require(source_type in ALLOWED_STYLE_SOURCES, "style_kit.json source_type is invalid")
             result.require(is_nonempty_collection(source.get("source_paths")), "style_kit.json source_paths must not be empty")
-            result.require(not is_empty_value(source.get("approval_id")), "style_kit.json source approval_id is required")
             for source_path in path_list(source.get("source_paths")):
                 result.require(rel_path_exists(order_dir, source_path), f"style_kit source path does not exist: {source_path}")
-            if source.get("approval_id"):
-                result.require(str(source["approval_id"]) in approval_ids(order_dir, result), "style_kit source approval_id is not approved")
             if is_sample_required(order_dir, result):
                 result.require(source_type == "approved_sample", "sample-required order must use approved_sample style source")
                 result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "approved_sample style source requires approved_sample_paths")
+                decision_path = source.get("customer_decision_path")
+                result.require(
+                    decision_path == "04_sample/customer_sample_decision.json",
+                    "approved_sample style source must reference customer_sample_decision.json",
+                )
+                check_customer_sample_decision(order_dir, result, {"approved"})
+                approved_reference = load_json(
+                    sample_dir / "approved_sample_reference.json",
+                    result,
+                    "04_sample/approved_sample_reference.json",
+                )
+                if approved_reference:
+                    result.require(
+                        approved_reference.get("customer_decision_path") == "04_sample/customer_sample_decision.json",
+                        "approved sample reference must link customer_sample_decision.json",
+                    )
+                    approved_samples = approved_reference.get("approved_samples")
+                    result.require(
+                        isinstance(approved_samples, list) and bool(approved_samples),
+                        "approved sample reference approved_samples must not be empty",
+                    )
+                    if isinstance(approved_samples, list):
+                        for index, approved_sample in enumerate(approved_samples, start=1):
+                            sample_path = approved_sample.get("path") if isinstance(approved_sample, dict) else None
+                            result.require(
+                                isinstance(sample_path, str) and rel_path_exists(order_dir, sample_path),
+                                f"approved sample reference item {index} path does not exist",
+                            )
             else:
                 result.require(source_type in ALLOWED_STYLE_SOURCES - {"approved_sample"}, "direct production must use a non-sample style source")
+                approval_id = source.get("approval_id")
+                result.require(not is_empty_value(approval_id), "direct style source approval_id is required")
+                if approval_id:
+                    result.require(str(approval_id) in approval_ids(order_dir, result), "style_kit source approval_id is not approved")
             contract = load_production_contract(order_dir, result)
             contract_style = contract.get("style_kit") if contract else None
             contract_source = contract_style.get("source_type") if isinstance(contract_style, dict) else None
@@ -601,6 +640,32 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
     ]:
         result.require((style_kit / rel_path).exists(), f"missing style kit artifact: 04_sample/style_kit/{rel_path}")
     load_json(style_kit / "locked_elements.json", result, "04_sample/style_kit/locked_elements.json")
+
+
+def check_customer_sample_decision(
+    order_dir: Path,
+    result: ValidationResult,
+    allowed_statuses: set[str] | None = None,
+) -> dict[str, Any] | None:
+    decision = load_json(
+        order_dir / "04_sample" / "customer_sample_decision.json",
+        result,
+        "04_sample/customer_sample_decision.json",
+    )
+    if not decision:
+        return None
+    order_id = order_id_from_state(order_dir, result)
+    result.require(decision.get("order_id") == order_id, "customer sample decision order_id must match state.json")
+    status = decision.get("status")
+    result.require(status in {"approved", "revision_requested", "ambiguous"}, "customer sample decision status is invalid")
+    if allowed_statuses is not None:
+        result.require(status in allowed_statuses, f"customer sample decision status must be one of {sorted(allowed_statuses)}")
+    result.require(is_nonempty_collection(decision.get("source_message_ids")), "customer sample decision requires source_message_ids")
+    result.require(not is_empty_value(decision.get("evidence_text")), "customer sample decision requires evidence_text")
+    result.require(decision.get("confidence") in {"high", "medium", "low"}, "customer sample decision confidence is invalid")
+    if status == "revision_requested":
+        result.require(is_nonempty_collection(decision.get("requested_changes")), "sample revision decision requires requested_changes")
+    return decision
 
 
 def load_slide_jobs(order_dir: Path, result: ValidationResult) -> dict[str, Any] | None:
@@ -908,12 +973,98 @@ def check_qa(order_dir: Path, result: ValidationResult) -> None:
         result.require(status == "pass", "qa_report.md Status must be pass")
 
 
+def check_send_manifest(
+    order_dir: Path,
+    result: ValidationResult,
+    path: Path,
+    label: str,
+    expected_purpose: str,
+    expected_action: str,
+) -> dict[str, Any] | None:
+    payload = load_json(path, result, label)
+    if not payload:
+        return None
+    order_id = order_id_from_state(order_dir, result)
+    result.require(payload.get("order_id") == order_id, f"{label} order_id must match state.json")
+    result.require(payload.get("purpose") == expected_purpose, f"{label} purpose must be {expected_purpose}")
+
+    message_path = safe_runtime_path(order_dir, payload.get("message_path"), result, f"{label} message_path")
+    message_sha = payload.get("message_sha256")
+    result.require(
+        isinstance(message_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", message_sha),
+        f"{label} message_sha256 is invalid",
+    )
+    if message_path is not None:
+        result.require(exists_nonempty(message_path), f"{label} message_path does not exist")
+        if message_path.exists() and isinstance(message_sha, str):
+            result.require(sha256_file(message_path) == message_sha, f"{label} message_sha256 mismatch")
+
+    approval_id = payload.get("approval_id")
+    contact_id = payload.get("contact_id")
+    matches = [
+        record
+        for record in approved_records(order_dir, result)
+        if record.get("approval_id") == approval_id
+        and record.get("action_type") == expected_action
+        and record.get("contact_id") == contact_id
+        and record.get("draft_sha256") == message_sha
+    ]
+    result.require(bool(matches), f"{label} has no matching {expected_action} approval")
+    check_file_manifest(order_dir, result, path, label)
+    return payload
+
+
+def check_sample_delivery(order_dir: Path, result: ValidationResult) -> None:
+    check_decision(order_dir, result)
+    sample_dir = order_dir / "04_sample"
+    result.require(exists_nonempty(sample_dir / "sample_contract.json"), "missing or empty 04_sample/sample_contract.json")
+    result.require(exists_nonempty(sample_dir / "sample_qa.md"), "missing or empty 04_sample/sample_qa.md")
+    result.require(qa_status_from_markdown(sample_dir / "sample_qa.md") == "pass", "sample_qa.md Status must be pass")
+    result.require(exists_nonempty(sample_dir / "sample_delivery_message.md"), "missing or empty 04_sample/sample_delivery_message.md")
+    check_send_manifest(
+        order_dir,
+        result,
+        sample_dir / "sample_send_manifest.json",
+        "04_sample/sample_send_manifest.json",
+        "sample",
+        "send_sample",
+    )
+
+
+def check_sample_feedback(order_dir: Path, result: ValidationResult) -> None:
+    check_sample_delivery(order_dir, result)
+    sample_dir = order_dir / "04_sample"
+    receipt = load_json(sample_dir / "sample_send_receipt.json", result, "04_sample/sample_send_receipt.json")
+    manifest = load_json(sample_dir / "sample_send_manifest.json", result, "04_sample/sample_send_manifest.json")
+    if receipt:
+        order_id = order_id_from_state(order_dir, result)
+        result.require(receipt.get("order_id") == order_id, "sample send receipt order_id must match state.json")
+        if manifest:
+            result.require(receipt.get("manifest_id") == manifest.get("manifest_id"), "sample send receipt manifest_id mismatch")
+            result.require(receipt.get("message_sha256") == manifest.get("message_sha256"), "sample send receipt message hash mismatch")
+        check_file_manifest(order_dir, result, sample_dir / "sample_send_receipt.json", "04_sample/sample_send_receipt.json")
+        screenshot = safe_runtime_path(
+            order_dir,
+            receipt.get("post_send_screenshot"),
+            result,
+            "04_sample/sample_send_receipt.json post_send_screenshot",
+        )
+        if screenshot is not None:
+            result.require(screenshot.exists(), "sample send receipt post_send_screenshot does not exist")
+    check_customer_sample_decision(order_dir, result)
+
+
 def check_delivery(order_dir: Path, result: ValidationResult) -> None:
     check_qa(order_dir, result)
-    result.require(exists_nonempty(order_dir / "07_delivery" / "delivery_message.md"), "missing or empty 07_delivery/delivery_message.md")
-    result.require(
-        approval_ids(order_dir, result, {"send_final_delivery"}),
-        "missing order-scoped send_final_delivery record before delivery",
+    delivery_dir = order_dir / "07_delivery"
+    result.require(exists_nonempty(delivery_dir / "delivery_message.md"), "missing or empty 07_delivery/delivery_message.md")
+    check_send_manifest(
+        order_dir,
+        result,
+        delivery_dir / "final_send_manifest.json",
+        "07_delivery/final_send_manifest.json",
+        "final_delivery",
+        "send_final_delivery",
     )
 
 
@@ -963,6 +1114,8 @@ GATES: dict[str, Callable[[Path, ValidationResult], None]] = {
     "decision": check_decision,
     "production": check_production,
     "sample_accuracy": check_sample_accuracy,
+    "sample_delivery": check_sample_delivery,
+    "sample_feedback": check_sample_feedback,
     "slide_jobs": check_slide_jobs,
     "visual_qa": check_visual_qa,
     "qa": check_qa,

@@ -31,6 +31,10 @@ def sha256_text(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def sha256_file(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 class ValidateOrderTests(unittest.TestCase):
     def setUp(self) -> None:
         shutil.rmtree(PROJECT_ROOT / "tmp", ignore_errors=True)
@@ -351,6 +355,66 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("topic is required but evidence is empty", result.stdout)
 
+    def test_codex_attachment_intake_does_not_require_fake_screenshots(self) -> None:
+        order_dir = self.create_order()
+        attachment = order_dir / "02_attachments_raw" / "from_codex" / "brief.pdf"
+        attachment.parent.mkdir(parents=True, exist_ok=True)
+        attachment.write_bytes(b"customer-brief")
+        write_json(
+            order_dir / "01_chat" / "coverage_result.json",
+            {
+                "source_type": "codex_attachment",
+                "status": "success",
+                "screens_captured": 0,
+                "top_anchor": None,
+                "bottom_anchor": None,
+                "adjacent_overlap_checks": {"passed": 0, "total": 0, "failed_screen_pairs": []},
+                "attachments_found": 1,
+                "attachments_downloaded": 1,
+                "attachments_failed": 0,
+                "source_attachment_paths": ["02_attachments_raw/from_codex/brief.pdf"],
+                "suspected_conflicts": 0,
+                "blocking_issues": [],
+            },
+        )
+        (order_dir / "01_chat" / "chat_coverage_report.md").write_text(
+            "Source: codex_attachment\nStatus: complete\n",
+            encoding="utf-8",
+        )
+        (order_dir / "01_chat" / "message_index.jsonl").write_text(
+            json.dumps(
+                {
+                    "message_id": "codex_prompt_001",
+                    "screen_ids": [],
+                    "sender": "owner",
+                    "sent_at": "2026-07-06T10:00:00+08:00",
+                    "text": "把附件当作一个 PPT 订单",
+                    "attachments": ["att_codex_001"],
+                    "ocr_confidence": "high",
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (order_dir / "02_attachments_raw" / "attachment_index.jsonl").write_text(
+            json.dumps(
+                {
+                    "attachment_id": "att_codex_001",
+                    "saved_path": "02_attachments_raw/from_codex/brief.pdf",
+                    "source_message_id": "codex_prompt_001",
+                    "sha256": sha256_file(attachment),
+                    "download_status": "success",
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "chat_capture")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_required_empty_collection_fails_briefing(self) -> None:
         order_dir = self.prepare_order_through_production()
         requirements_path = order_dir / "03_requirements" / "requirements.json"
@@ -437,6 +501,152 @@ class ValidateOrderTests(unittest.TestCase):
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sample-required order must use approved_sample style source", result.stdout)
+
+    def test_sample_state_machine_waits_for_customer_feedback(self) -> None:
+        machine = json.loads((PROJECT_ROOT / "configs" / "state_machine.json").read_text(encoding="utf-8"))
+        states = machine["states"]
+
+        self.assertEqual(states["SAMPLE_QA"]["allowed_next"], ["WAITING_OWNER_SAMPLE_SEND_CONFIRMATION", "FAILED_BLOCKED"])
+        self.assertNotIn("FULL_PRODUCTION", states["WAITING_OWNER_SAMPLE_SEND_CONFIRMATION"]["allowed_next"])
+        self.assertEqual(states["WAITING_OWNER_SAMPLE_SEND_CONFIRMATION"]["allowed_next"], ["SAMPLE_SENT", "FAILED_BLOCKED"])
+        self.assertIn("WAITING_CLIENT_SAMPLE_FEEDBACK", states["SAMPLE_SENT"]["allowed_next"])
+        self.assertIn("SAMPLE_APPROVED", states["WAITING_CLIENT_SAMPLE_FEEDBACK"]["allowed_next"])
+        self.assertIn("FULL_PRODUCTION", states["SAMPLE_APPROVED"]["allowed_next"])
+
+    def test_sample_delivery_manifest_requires_matching_send_approval(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        order_id = json.loads((order_dir / "00_state" / "state.json").read_text(encoding="utf-8"))["order_id"]
+        sample_dir = order_dir / "04_sample"
+        write_json(sample_dir / "sample_contract.json", {"sample_slides": [1]})
+        (sample_dir / "sample_qa.md").write_text("Status: pass\n", encoding="utf-8")
+        message = "这是样稿，请查收。"
+        (sample_dir / "sample_delivery_message.md").write_text(message, encoding="utf-8")
+        (sample_dir / "sample_deck.pdf").write_bytes(b"sample-pdf")
+        message_sha = sha256_text(message)
+        approval = {
+            "approval_id": "appr_send_sample",
+            "order_id": order_id,
+            "action_type": "send_sample",
+            "contact_id": "cs_a",
+            "draft_sha256": message_sha,
+            "status": "approved",
+            "created_at": "2026-07-06T10:04:00+08:00",
+            "approved_at": "2026-07-06T10:05:00+08:00",
+        }
+        approvals_path = order_dir / "00_state" / "approvals.jsonl"
+        with approvals_path.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(approval, ensure_ascii=False) + "\n")
+        write_json(
+            sample_dir / "sample_send_manifest.json",
+            {
+                "manifest_id": "manifest_sample_1",
+                "order_id": order_id,
+                "purpose": "sample",
+                "contact_id": "cs_a",
+                "approval_id": "appr_send_sample",
+                "message_path": "04_sample/sample_delivery_message.md",
+                "message_sha256": message_sha,
+                "files": [
+                    {
+                        "path": "04_sample/sample_deck.pdf",
+                        "sha256": sha256_file(sample_dir / "sample_deck.pdf"),
+                        "type": "pdf",
+                    }
+                ],
+                "created_at": "2026-07-06T10:05:00+08:00",
+            },
+        )
+
+        passed = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_delivery")
+        self.assertEqual(passed.returncode, 0, passed.stdout)
+
+        approval["action_type"] = "send_final_delivery"
+        approvals_path.write_text(
+            json.dumps(json.loads(approvals_path.read_text(encoding="utf-8").splitlines()[0]), ensure_ascii=False)
+            + "\n"
+            + json.dumps(approval, ensure_ascii=False)
+            + "\n",
+            encoding="utf-8",
+        )
+        failed = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_delivery")
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertIn("has no matching send_sample approval", failed.stdout)
+
+    def test_customer_approved_sample_can_authorize_style_kit(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        order_id = json.loads((order_dir / "00_state" / "state.json").read_text(encoding="utf-8"))["order_id"]
+        requirements_path = order_dir / "03_requirements" / "requirements.json"
+        requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        requirements["sample_required"]["value"] = True
+        write_json(requirements_path, requirements)
+        contract = self.valid_contract()
+        contract["style_kit"]["source_type"] = "approved_sample"
+        write_json(order_dir / "03_requirements" / "production_contract.json", contract)
+        sample_dir = order_dir / "04_sample"
+        write_json(sample_dir / "sample_contract.json", {"sample_slides": [1]})
+        preview = sample_dir / "sample_preview_images" / "sample_01.png"
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        preview.write_bytes(b"sample-image")
+        write_json(
+            sample_dir / "customer_sample_decision.json",
+            {
+                "decision_id": "sample_decision_1",
+                "order_id": order_id,
+                "status": "approved",
+                "source_message_ids": ["msg_customer_approved"],
+                "evidence_text": "客户：可以，按这个做。",
+                "confidence": "high",
+                "captured_at": "2026-07-06T10:20:00+08:00",
+            },
+        )
+        write_json(
+            sample_dir / "approved_sample_reference.json",
+            {
+                "customer_decision_path": "04_sample/customer_sample_decision.json",
+                "approved_samples": [
+                    {
+                        "slide_no": 1,
+                        "path": "04_sample/sample_preview_images/sample_01.png",
+                        "use_as": "content_page_reference",
+                        "page_family": "content",
+                    }
+                ],
+                "style_kit": {
+                    "template_master": "04_sample/style_kit/template_master.png",
+                    "style_anchor": "04_sample/style_kit/style_anchor.png",
+                    "navigation_bar": None,
+                    "color_behavior": "match sample",
+                    "typography_behavior": "match sample",
+                    "image_treatment": "match sample",
+                },
+                "must_match_in_production": ["palette", "title hierarchy"],
+            },
+        )
+        style_dir = sample_dir / "style_kit"
+        style_dir.mkdir(parents=True, exist_ok=True)
+        for image_name in ["style_anchor.png", "template_master.png", "content_ref.png"]:
+            (style_dir / image_name).write_bytes(b"fake-image")
+        write_json(
+            style_dir / "style_kit.json",
+            {
+                "source": {
+                    "source_type": "approved_sample",
+                    "source_paths": ["04_sample/sample_preview_images/sample_01.png"],
+                    "customer_decision_path": "04_sample/customer_sample_decision.json",
+                },
+                "approved_sample_paths": ["04_sample/sample_preview_images/sample_01.png"],
+                "style_anchor": "04_sample/style_kit/style_anchor.png",
+                "template_master": "04_sample/style_kit/template_master.png",
+                "navigation_bar": None,
+                "page_family_refs": {"cover": "04_sample/style_kit/style_anchor.png", "content": "04_sample/style_kit/content_ref.png"},
+                "locked_elements": "04_sample/style_kit/locked_elements.json",
+                "must_match": ["color palette", "title hierarchy"],
+            },
+        )
+        write_json(style_dir / "locked_elements.json", {"canvas": {"width": 1920, "height": 1080}})
+
+        result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "sample_accuracy")
+        self.assertEqual(result.returncode, 0, result.stdout)
 
     def test_slide_jobs_reject_empty_exact_content(self) -> None:
         order_dir = self.prepare_order_through_production()

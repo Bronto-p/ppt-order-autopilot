@@ -1,9 +1,11 @@
 {
   "state_version": 1,
   "inquiry_id": null,
+  "source_type": null,
   "contact_id": null,
   "state": "PREPARED",
   "ask_message_hash": null,
+  "source_attachment_paths": [],
   "sent_message_ledger_id": null,
   "sent_at": null,
   "completed_reply_checks_minutes": [],

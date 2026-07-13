@@ -1,4 +1,5 @@
 {
+  "source_type": "wecom",
   "status": "blocked",
   "screens_captured": 0,
   "top_anchor": null,
@@ -11,9 +12,9 @@
   "attachments_found": 0,
   "attachments_downloaded": 0,
   "attachments_failed": 0,
+  "source_attachment_paths": [],
   "suspected_conflicts": 0,
   "blocking_issues": [
     "coverage not captured yet"
   ]
 }
-

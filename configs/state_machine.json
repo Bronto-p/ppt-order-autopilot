@@ -14,10 +14,21 @@
     "IDLE": {
       "allowed_next": [
         "SCHEDULED_ASK",
+        "DIRECT_INTAKE_STAGED",
         "REPLY_DETECTED",
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [],
+      "requires_owner_approval": false
+    },
+    "DIRECT_INTAKE_STAGED": {
+      "allowed_next": [
+        "BUILDING_TRANSCRIPT",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "02_attachments_raw/attachment_index.jsonl"
+      ],
       "requires_owner_approval": false
     },
     "SCHEDULED_ASK": {
@@ -277,7 +288,7 @@
     },
     "SAMPLE_QA": {
       "allowed_next": [
-        "WAITING_SAMPLE_APPROVAL",
+        "WAITING_OWNER_SAMPLE_SEND_CONFIRMATION",
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
@@ -285,9 +296,9 @@
       ],
       "requires_owner_approval": false
     },
-    "WAITING_SAMPLE_APPROVAL": {
+    "WAITING_OWNER_SAMPLE_SEND_CONFIRMATION": {
       "allowed_next": [
-        "FULL_PRODUCTION",
+        "SAMPLE_SENT",
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
@@ -296,6 +307,64 @@
         "00_state/approvals.jsonl"
       ],
       "requires_owner_approval": true
+    },
+    "SAMPLE_SENT": {
+      "allowed_next": [
+        "WAITING_CLIENT_SAMPLE_FEEDBACK",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_send_receipt.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "WAITING_CLIENT_SAMPLE_FEEDBACK": {
+      "allowed_next": [
+        "SAMPLE_APPROVED",
+        "SAMPLE_REVISION_REQUESTED",
+        "SAMPLE_FEEDBACK_AMBIGUOUS",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/sample_send_receipt.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "SAMPLE_FEEDBACK_AMBIGUOUS": {
+      "allowed_next": [
+        "SAMPLE_APPROVED",
+        "SAMPLE_REVISION_REQUESTED",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/customer_sample_decision.json"
+      ],
+      "requires_owner_approval": true
+    },
+    "SAMPLE_REVISION_REQUESTED": {
+      "allowed_next": [
+        "SAMPLE_PRODUCTION",
+        "WAITING_OWNER_CONFIRMATION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/customer_sample_decision.json"
+      ],
+      "requires_owner_approval": false
+    },
+    "SAMPLE_APPROVED": {
+      "allowed_next": [
+        "FULL_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/customer_sample_decision.json",
+        "04_sample/approved_sample_reference.json",
+        "04_sample/style_kit/style_kit.json",
+        "04_sample/style_kit/style_anchor.png",
+        "04_sample/style_kit/template_master.png"
+      ],
+      "requires_owner_approval": false
     },
     "FULL_PRODUCTION": {
       "allowed_next": [

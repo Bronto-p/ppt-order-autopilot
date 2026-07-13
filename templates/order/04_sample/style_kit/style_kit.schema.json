@@ -16,8 +16,7 @@
       "type": "object",
       "required": [
         "source_type",
-        "source_paths",
-        "approval_id"
+        "source_paths"
       ],
       "properties": {
         "source_type": {
@@ -38,6 +37,10 @@
           "uniqueItems": true
         },
         "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "customer_decision_path": {
           "type": "string",
           "minLength": 1
         }
@@ -109,8 +112,22 @@
       },
       "then": {
         "properties": {
+          "source": {
+            "required": [
+              "customer_decision_path"
+            ]
+          },
           "approved_sample_paths": {
             "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source": {
+            "required": [
+              "approval_id"
+            ]
           }
         }
       }
