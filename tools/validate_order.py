@@ -811,8 +811,8 @@ def check_delivery(order_dir: Path, result: ValidationResult) -> None:
     check_qa(order_dir, result)
     result.require(exists_nonempty(order_dir / "07_delivery" / "delivery_message.md"), "missing or empty 07_delivery/delivery_message.md")
     result.require(
-        approval_ids(order_dir, result, {"approve_delivery"}),
-        "missing order-scoped approve_delivery record before delivery",
+        approval_ids(order_dir, result, {"send_final_delivery"}),
+        "missing order-scoped send_final_delivery record before delivery",
     )
 
 
