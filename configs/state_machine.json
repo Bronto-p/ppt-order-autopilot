@@ -276,6 +276,7 @@
     },
     "DIRECT_PRODUCTION_ALLOWED": {
       "allowed_next": [
+        "OWNER_SAMPLE_PRODUCTION",
         "FULL_PRODUCTION",
         "FAILED_BLOCKED"
       ],
@@ -286,6 +287,33 @@
       "requires_owner_approval": false,
       "validation_gate": "production",
       "required_skill": "ppt-production-contract-builder"
+    },
+    "OWNER_SAMPLE_PRODUCTION": {
+      "allowed_next": [
+        "OWNER_SAMPLE_REVIEW",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "03_requirements/production_contract.json",
+        "04_sample/sample_contract.json"
+      ],
+      "requires_owner_approval": false,
+      "validation_gate": "production",
+      "required_skill": "ppt-sample-manager"
+    },
+    "OWNER_SAMPLE_REVIEW": {
+      "allowed_next": [
+        "OWNER_SAMPLE_PRODUCTION",
+        "FULL_PRODUCTION",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "04_sample/owner_sample_manifest.json",
+        "04_sample/sample_qa.md"
+      ],
+      "requires_owner_approval": true,
+      "validation_gate": "owner_sample_ready",
+      "required_skill": "ppt-sample-manager"
     },
     "SAMPLE_PRODUCTION": {
       "allowed_next": [

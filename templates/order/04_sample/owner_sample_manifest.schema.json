@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner Complete-Slide Sample Manifest",
+  "type": "object",
+  "required": [
+    "manifest_id",
+    "order_id",
+    "sample_slide_no",
+    "page_type",
+    "prompt_path",
+    "preview_path",
+    "preview_sha256",
+    "output_mode",
+    "generation_scope",
+    "contains_real_content",
+    "qa_checks",
+    "backend",
+    "created_at"
+  ],
+  "properties": {
+    "manifest_id": {"type": "string", "minLength": 1},
+    "order_id": {"type": "string", "minLength": 1},
+    "sample_slide_no": {"type": "integer", "minimum": 1},
+    "page_type": {"type": "string", "minLength": 1},
+    "prompt_path": {"const": "04_sample/sample_prompt.md"},
+    "preview_path": {"pattern": "^04_sample/sample_preview_images/.+\\.png$"},
+    "preview_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "output_mode": {
+      "enum": ["image_first", "hybrid", "template_native", "editable_reconstruction"]
+    },
+    "generation_scope": {"const": "complete_slide"},
+    "contains_real_content": {"const": true},
+    "qa_checks": {
+      "type": "object",
+      "required": [
+        "full_slide_composition",
+        "all_required_text_visible",
+        "not_background_only",
+        "text_readability"
+      ],
+      "properties": {
+        "full_slide_composition": {"const": true},
+        "all_required_text_visible": {"const": true},
+        "not_background_only": {"const": true},
+        "text_readability": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "required": ["selected_backend", "uses_image_generation", "image_generation_only"],
+      "properties": {
+        "selected_backend": {"type": "string", "minLength": 1},
+        "uses_image_generation": {"const": true},
+        "image_generation_only": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"output_mode": {"const": "image_first"}}},
+      "then": {"properties": {"backend": {"properties": {"image_generation_only": {"const": true}}}}}
+    }
+  ],
+  "additionalProperties": false
+}

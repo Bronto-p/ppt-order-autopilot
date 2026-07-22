@@ -108,7 +108,7 @@ The parent retains the production contract, deck story, style kit index, slide r
 | Stage an explicitly named workspace file | `codex-attachment-intake` with `source_type=workspace_file` |
 | Interpret chat and customer files | Current agent using `wecom-chat-recorder` and `ppt-order-briefing` |
 | Decide next business step | Current agent using `ppt-order-decision` and owner gates |
-| Generate sample/final slides | One subagent per slide with the contract-selected backend and output mode |
+| Generate sample/final slides | One subagent per slide; `image_first` must return the complete page, never a background-only layer |
 | Inspect images and cross-slide consistency | Parent agent using visual inspection and QA contracts |
 | Assemble PPTX/PDF and verify exports | Presentation/PDF tooling selected by production core |
 
@@ -132,8 +132,9 @@ On ambiguous external state, inspect the UI or artifact first. Never assume an a
 
 ## 7. Human Gates
 
-Stop and request owner confirmation only for customer commitments or explicit hard stops:
+Stop and request owner confirmation only for high-impact gates or explicit hard stops:
 
+- the complete single-slide sample shown in Codex before `owner_direct` full production;
 - accept/reject, price, deadline, scope, or missing-question message;
 - sample delivery; ambiguous customer sample feedback;
 - final delivery;
@@ -141,7 +142,7 @@ Stop and request owner confirmation only for customer commitments or explicit ha
 - repeated QA failure beyond the permitted automatic repair attempt;
 - identity, chat coverage, source truth, or required-asset ambiguity.
 
-Folder creation, OCR, indexing, requirement drafting, contract drafting, slide packaging, first repair, export, QA, and delivery-message drafting are internal actions and should continue automatically.
+Folder creation, OCR, indexing, requirement drafting, contract drafting, sample generation/QA, slide packaging, first repair, export, QA, and delivery-message drafting are internal actions and should continue automatically. `OWNER_SAMPLE_REVIEW` is the one intentional design pause: display the complete page preview, bind approval to its manifest hash, then continue.
 
 Clear customer sample feedback is not another owner gate. Record it in `customer_sample_decision.json`: explicit approval proceeds to style-kit/full production, and explicit requested changes return to sample production. Ask the owner only when the feedback is ambiguous or changes price, deadline, page count, or style scope.
 

@@ -301,6 +301,9 @@ class ValidateOrderTests(unittest.TestCase):
                     "one_slide_only": True,
                     "uses_image_generation": True,
                     "image_generation_only": True,
+                    "must_generate_complete_slide": True,
+                    "must_render_all_visible_content": True,
+                    "forbid_background_only": True,
                     "must_not_use_text_only_fallback": True,
                     "if_required_image_missing": "block",
                 },
@@ -327,6 +330,22 @@ class ValidateOrderTests(unittest.TestCase):
         automation_state = json.loads((LEDGERS_ROOT / "automation_state.json").read_text(encoding="utf-8"))
         self.assertEqual(automation_state["state"], "IDLE")
         self.assertIn("automation_binding", automation_state)
+
+    def test_owner_direct_defaults_to_complete_slide_sample(self) -> None:
+        result = run_tool(
+            "tools/init_order.py",
+            "--title", "owner sample",
+            "--execution-mode", "owner_direct",
+            "--intake-source", "workspace_file",
+            "--orders-root", "tmp/test-suite-orders",
+            "--with-templates",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        order_dir = Path(result.stdout.strip())
+        requirements = json.loads((order_dir / "03_requirements" / "requirements.json").read_text(encoding="utf-8"))
+        self.assertIs(requirements["sample_required"]["value"], True)
+        self.assertEqual(requirements["sample_scope"]["value"], "one complete representative slide with real content")
+        self.assertEqual(requirements["output_mode"]["value"], "image_first")
 
     def test_template_order_passes_base_but_blocks_chat_capture(self) -> None:
         order_dir = self.create_order()
@@ -546,6 +565,79 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertIn("WAITING_CLIENT_SAMPLE_FEEDBACK", states["SAMPLE_SENT"]["allowed_next"])
         self.assertIn("SAMPLE_APPROVED", states["WAITING_CLIENT_SAMPLE_FEEDBACK"]["allowed_next"])
         self.assertIn("FULL_PRODUCTION", states["SAMPLE_APPROVED"]["allowed_next"])
+        self.assertIn("OWNER_SAMPLE_PRODUCTION", states["DIRECT_PRODUCTION_ALLOWED"]["allowed_next"])
+        self.assertEqual(states["OWNER_SAMPLE_PRODUCTION"]["allowed_next"], ["OWNER_SAMPLE_REVIEW", "FAILED_BLOCKED"])
+        self.assertTrue(states["OWNER_SAMPLE_REVIEW"]["requires_owner_approval"])
+
+    def test_owner_sample_rejects_background_only_manifest(self) -> None:
+        order_dir = self.prepare_order_through_production()
+        state_path = order_dir / "00_state" / "state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state.update({"execution_mode": "owner_direct", "delivery_target": "owner_codex"})
+        write_json(state_path, state)
+        requirements_path = order_dir / "03_requirements" / "requirements.json"
+        requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        requirements["sample_required"]["value"] = True
+        write_json(requirements_path, requirements)
+        with (order_dir / "00_state" / "approvals.jsonl").open("a", encoding="utf-8") as file:
+            file.write(json.dumps({
+                "approval_id": "owner_instruction_test",
+                "order_id": state["order_id"],
+                "action_type": "owner_direct_instruction",
+                "status": "approved",
+            }) + "\n")
+        write_json(order_dir / "03_requirements" / "production_contract.json", self.valid_contract())
+        sample_dir = order_dir / "04_sample"
+        write_json(sample_dir / "sample_contract.json", {
+            "sample_page_count": 1,
+            "sample_slide_no": 1,
+            "sample_goal": "both",
+            "use_real_content": True,
+            "output_mode": "image_first",
+            "generation_scope": "complete_slide",
+            "reference_files": [],
+            "approval_id": "owner_instruction_test",
+            "backend": {
+                "selected_backend": "imagegen",
+                "requires_image_inputs": False,
+                "uses_image_generation": True,
+                "image_generation_only": True,
+            },
+        })
+        (sample_dir / "sample_prompt.md").write_text("Generate a background plate with no text.\n", encoding="utf-8")
+        (sample_dir / "sample_qa.md").write_text("Status: pass\n", encoding="utf-8")
+        preview = sample_dir / "sample_preview_images" / "sample_01.png"
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (1600, 900), (10, 20, 40)).save(preview)
+        write_json(sample_dir / "owner_sample_manifest.json", {
+            "manifest_id": "owner_sample_1",
+            "order_id": state["order_id"],
+            "sample_slide_no": 1,
+            "page_type": "content",
+            "prompt_path": "04_sample/sample_prompt.md",
+            "preview_path": "04_sample/sample_preview_images/sample_01.png",
+            "preview_sha256": sha256_file(preview),
+            "output_mode": "image_first",
+            "generation_scope": "background_only",
+            "contains_real_content": True,
+            "qa_checks": {
+                "full_slide_composition": False,
+                "all_required_text_visible": False,
+                "not_background_only": False,
+                "text_readability": True,
+            },
+            "backend": {
+                "selected_backend": "imagegen",
+                "uses_image_generation": True,
+                "image_generation_only": True,
+            },
+            "created_at": "2026-07-22T13:00:00+08:00",
+        })
+
+        checked = run_tool("tools/validate_order.py", str(order_dir), "--gate", "owner_sample_ready")
+        self.assertNotEqual(checked.returncode, 0)
+        self.assertIn("complete slide, not a background plate", checked.stdout)
+        self.assertIn("prompt requests a background/visual layer", checked.stdout)
 
     def test_sample_delivery_manifest_requires_matching_send_approval(self) -> None:
         order_dir = self.prepare_order_through_production()
@@ -724,7 +816,7 @@ class ValidateOrderTests(unittest.TestCase):
             },
             "backend": {"selected_backend": "test-image-backend", "mode": "image_edit", "requires_image_inputs": True},
             "qa_requirements": ["exact_content", "text_readability", "style_match"],
-            "worker_policy": {"reasoning_level": "high", "one_slide_only": True, "uses_image_generation": True, "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
+            "worker_policy": {"reasoning_level": "high", "one_slide_only": True, "uses_image_generation": True, "image_generation_only": True, "must_generate_complete_slide": True, "must_render_all_visible_content": True, "forbid_background_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
         })
 
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")

@@ -34,6 +34,8 @@ orders/{order_id}_{topic}/
 │   └── production_contract.json
 ├── 04_sample/
 │   ├── sample_contract.json
+│   ├── owner_sample_manifest.json
+│   ├── owner_sample_decision.json
 │   ├── sample_send_manifest.json
 │   ├── sample_send_receipt.json
 │   ├── customer_sample_decision.json
@@ -122,6 +124,8 @@ orders/{order_id}_{topic}/
 `production_contract.json` 是 PPT 生产层唯一入口。它必须由 briefing 和 decision 后生成，并经过人工确认。
 
 `owner_direct` 不伪造 customer decision。用户的 exact prompt 可以形成 order-scoped `owner_direct_instruction` approval；production contract 必须同时记录 execution mode、delivery target 和每页 output mode。
+
+设计型 owner-direct 生产前，`owner_sample_manifest.json` 必须证明样稿是含真实内容的完整页面并绑定预览 hash；`owner_sample_decision.json` 必须把 owner 的批准或修改意见绑定到同一个 hash。纯背景图不能进入 style kit 或正稿生产。
 
 生产层不能直接读取企业微信、聊天截图或未经整理的客服消息。
 

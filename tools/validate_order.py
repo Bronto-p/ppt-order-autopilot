@@ -373,7 +373,19 @@ def check_briefing(order_dir: Path, result: ValidationResult) -> None:
     result.require(exists_nonempty(req_dir / "order_brief.md"), "missing or empty 03_requirements/order_brief.md")
     result.require((req_dir / "missing_questions.md").exists(), "missing 03_requirements/missing_questions.md")
     result.require((req_dir / "conflicts.md").exists(), "missing 03_requirements/conflicts.md")
-    check_requirements(order_dir, result)
+    requirements = check_requirements(order_dir, result)
+    if requirements and execution_mode(order_dir, result) == "owner_direct":
+        sample = requirements.get("sample_required")
+        result.require(
+            isinstance(sample, dict) and sample.get("value") is True,
+            "owner_direct production requires one complete-slide sample before full production",
+        )
+        output = requirements.get("output_mode")
+        if isinstance(output, dict) and output.get("value") in ALLOWED_OUTPUT_MODES - {"image_first"}:
+            result.require(
+                output.get("confidence") == "high" and not is_empty_value(output.get("evidence")),
+                "non-image_first owner output requires explicit high-confidence evidence; inferred hybrid/native mode is forbidden",
+            )
 
 
 def check_pending_approval(order_dir: Path, result: ValidationResult) -> dict[str, Any] | None:
@@ -532,6 +544,14 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
         result.require(method.get("production_mode") in ALLOWED_PRODUCTION_MODES, "production_mode is invalid")
         result.require(method.get("subagents_required") is True, "subagents_required must be true")
         result.require(method.get("default_reasoning_level") in ALLOWED_WORKER_REASONING, "default reasoning must be medium/high")
+        requirements = check_requirements(order_dir, result)
+        output_requirement = requirements.get("output_mode") if isinstance(requirements, dict) else None
+        required_mode = output_requirement.get("value") if isinstance(output_requirement, dict) else None
+        if required_mode in ALLOWED_OUTPUT_MODES:
+            result.require(
+                method.get("production_mode") in {required_mode, "mixed"},
+                "production_mode conflicts with requirements.output_mode",
+            )
 
     style_kit = contract.get("style_kit")
     result.require(isinstance(style_kit, dict), "production_contract.style_kit must be an object")
@@ -625,6 +645,149 @@ def is_sample_required(order_dir: Path, result: ValidationResult) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"true", "yes", "y", "需要", "要", "required"}
     return False
+
+
+def check_owner_sample_manifest(order_dir: Path, result: ValidationResult) -> dict[str, Any] | None:
+    sample_dir = order_dir / "04_sample"
+    manifest_path = sample_dir / "owner_sample_manifest.json"
+    manifest = load_json(manifest_path, result, "04_sample/owner_sample_manifest.json")
+    if not manifest:
+        return None
+    result.require(manifest.get("order_id") == order_id_from_state(order_dir, result), "owner sample order_id must match state.json")
+    result.require(manifest.get("output_mode") in ALLOWED_OUTPUT_MODES, "owner sample output_mode is invalid")
+    result.require(manifest.get("generation_scope") == "complete_slide", "owner sample must be a complete slide, not a background plate")
+    result.require(manifest.get("contains_real_content") is True, "owner sample must contain real slide content")
+    result.require(manifest.get("prompt_path") == "04_sample/sample_prompt.md", "owner sample prompt_path is invalid")
+    prompt_path = sample_dir / "sample_prompt.md"
+    result.require(exists_nonempty(prompt_path), "owner sample prompt is missing")
+    if exists_nonempty(prompt_path) and manifest.get("output_mode") == "image_first":
+        prompt = prompt_path.read_text(encoding="utf-8").lower()
+        forbidden_prompt_terms = [
+            "background plate",
+            "background only",
+            "visual layer",
+            "no text",
+            "背景底图",
+            "仅背景",
+            "不要文字",
+            "无文字",
+            "后续叠加",
+        ]
+        result.require(
+            not any(term in prompt for term in forbidden_prompt_terms),
+            "owner sample prompt requests a background/visual layer instead of a complete slide",
+        )
+    checks = manifest.get("qa_checks")
+    result.require(isinstance(checks, dict), "owner sample qa_checks must be an object")
+    if isinstance(checks, dict):
+        for name in ["full_slide_composition", "all_required_text_visible", "not_background_only", "text_readability"]:
+            result.require(checks.get(name) is True, f"owner sample QA failed: {name}")
+    backend = manifest.get("backend")
+    result.require(isinstance(backend, dict), "owner sample backend must be an object")
+    if isinstance(backend, dict):
+        result.require(not is_empty_value(backend.get("selected_backend")), "owner sample backend is missing")
+        result.require(backend.get("uses_image_generation") is True, "owner sample must use image generation")
+        result.require(isinstance(backend.get("image_generation_only"), bool), "owner sample image_generation_only must be boolean")
+        if manifest.get("output_mode") == "image_first":
+            result.require(backend.get("image_generation_only") is True, "image_first owner sample must be generated as one complete slide image")
+    preview_path = safe_runtime_path(order_dir, manifest.get("preview_path"), result, "owner sample preview_path")
+    preview_sha = manifest.get("preview_sha256")
+    result.require(
+        isinstance(preview_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", preview_sha),
+        "owner sample preview_sha256 is invalid",
+    )
+    if preview_path is not None:
+        result.require(preview_path.is_file(), "owner sample preview does not exist")
+        if preview_path.is_file():
+            result.require(sha256_file(preview_path) == preview_sha, "owner sample preview hash mismatch")
+            try:
+                with Image.open(preview_path) as preview:
+                    width, height = preview.size
+                result.require(max(width, height) >= 1200 and min(width, height) >= 675, "owner sample preview is below full-size review resolution")
+                contract = load_production_contract(order_dir, result)
+                aspect_ratio = contract_deck(contract).get("aspect_ratio") if contract else None
+                expected_ratio = {"16:9": 16 / 9, "4:3": 4 / 3}.get(aspect_ratio)
+                if expected_ratio is not None:
+                    result.require(
+                        abs(width / height - expected_ratio) < 0.02,
+                        f"owner sample preview must use the deck {aspect_ratio} canvas",
+                    )
+            except OSError:
+                result.errors.append("owner sample preview is not a readable image")
+
+    contract = load_production_contract(order_dir, result)
+    contract_slides = contract.get("slides", []) if isinstance(contract, dict) else []
+    matching_slides = [
+        slide
+        for slide in contract_slides
+        if isinstance(slide, dict) and slide.get("slide_no") == manifest.get("sample_slide_no")
+    ]
+    result.require(len(matching_slides) == 1, "owner sample must map to exactly one production-contract slide")
+    if len(matching_slides) == 1:
+        result.require(matching_slides[0].get("output_mode") == manifest.get("output_mode"), "owner sample output mode differs from its contract slide")
+        result.require(matching_slides[0].get("page_type") == manifest.get("page_type"), "owner sample page type differs from its contract slide")
+    return manifest
+
+
+def check_owner_sample_ready(order_dir: Path, result: ValidationResult) -> None:
+    check_contract_accuracy(order_dir, result)
+    result.require(execution_mode(order_dir, result) == "owner_direct", "owner sample review is only valid for owner_direct")
+    result.require(is_sample_required(order_dir, result), "owner sample review requires sample_required=true")
+    sample_contract = load_json(order_dir / "04_sample" / "sample_contract.json", result, "04_sample/sample_contract.json")
+    if sample_contract:
+        result.require(sample_contract.get("sample_page_count") == 1, "owner sample contract must select exactly one page")
+        result.require(isinstance(sample_contract.get("sample_slide_no"), int), "owner sample contract must select a slide number")
+        result.require(sample_contract.get("use_real_content") is True, "owner sample contract must use real content")
+        result.require(sample_contract.get("output_mode") in ALLOWED_OUTPUT_MODES, "owner sample contract output_mode is invalid")
+        result.require(sample_contract.get("generation_scope") == "complete_slide", "owner sample contract must require a complete slide")
+        sample_backend = sample_contract.get("backend")
+        result.require(isinstance(sample_backend, dict), "owner sample contract backend is missing")
+        if isinstance(sample_backend, dict):
+            result.require(sample_backend.get("uses_image_generation") is True, "owner sample contract must use image generation")
+            result.require(isinstance(sample_backend.get("image_generation_only"), bool), "owner sample contract image_generation_only must be boolean")
+            if sample_contract.get("output_mode") == "image_first":
+                result.require(sample_backend.get("image_generation_only") is True, "image_first owner sample contract must use one complete-slide generation")
+    result.require(qa_status_from_markdown(order_dir / "04_sample" / "sample_qa.md") == "pass", "owner sample QA must pass")
+    manifest = check_owner_sample_manifest(order_dir, result)
+    if manifest and isinstance(sample_contract, dict):
+        result.require(manifest.get("sample_slide_no") == sample_contract.get("sample_slide_no"), "owner sample slide differs from sample contract")
+        result.require(manifest.get("output_mode") == sample_contract.get("output_mode"), "owner sample output mode differs from sample contract")
+        result.require(manifest.get("backend", {}).get("selected_backend") == sample_contract.get("backend", {}).get("selected_backend"), "owner sample backend differs from sample contract")
+
+
+def check_owner_sample_decision(
+    order_dir: Path,
+    result: ValidationResult,
+    allowed_statuses: set[str] | None = None,
+) -> dict[str, Any] | None:
+    sample_dir = order_dir / "04_sample"
+    manifest_path = sample_dir / "owner_sample_manifest.json"
+    manifest = check_owner_sample_manifest(order_dir, result)
+    decision = load_json(sample_dir / "owner_sample_decision.json", result, "04_sample/owner_sample_decision.json")
+    if not manifest or not decision:
+        return None
+    result.require(decision.get("order_id") == order_id_from_state(order_dir, result), "owner sample decision order_id mismatch")
+    status = decision.get("status")
+    result.require(status in {"approved", "revision_requested"}, "owner sample decision status is invalid")
+    if allowed_statuses is not None:
+        result.require(status in allowed_statuses, f"owner sample decision status must be one of {sorted(allowed_statuses)}")
+    result.require(decision.get("manifest_path") == "04_sample/owner_sample_manifest.json", "owner sample decision manifest_path is invalid")
+    manifest_sha = sha256_file(manifest_path)
+    result.require(decision.get("manifest_sha256") == manifest_sha, "owner sample decision manifest hash mismatch")
+    result.require(not is_empty_value(decision.get("evidence_text")), "owner sample decision requires owner reply evidence")
+    if status == "revision_requested":
+        result.require(is_nonempty_collection(decision.get("requested_changes")), "owner sample revision requires requested_changes")
+    if status == "approved":
+        approval_id = decision.get("approval_id")
+        matches = [
+            record
+            for record in approved_records(order_dir, result)
+            if record.get("approval_id") == approval_id
+            and record.get("action_type") == "approve_owner_sample"
+            and record.get("manifest_sha256") == manifest_sha
+        ]
+        result.require(bool(matches), "owner sample approval is not bound to the reviewed manifest")
+    return decision
 
 
 def check_locked_elements(order_dir: Path, result: ValidationResult, locked: dict[str, Any] | None) -> None:
@@ -821,12 +984,23 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
             if is_sample_required(order_dir, result):
                 result.require(source_type == "approved_sample", "sample-required order must use approved_sample style source")
                 result.require(is_nonempty_collection(kit.get("approved_sample_paths")), "approved_sample style source requires approved_sample_paths")
-                decision_path = source.get("customer_decision_path")
-                result.require(
-                    decision_path == "04_sample/customer_sample_decision.json",
-                    "approved_sample style source must reference customer_sample_decision.json",
-                )
-                check_customer_sample_decision(order_dir, result, {"approved"})
+                mode = execution_mode(order_dir, result)
+                if mode == "owner_direct":
+                    result.require(
+                        source.get("owner_decision_path") == "04_sample/owner_sample_decision.json",
+                        "owner approved-sample style source must reference owner_sample_decision.json",
+                    )
+                    check_owner_sample_decision(order_dir, result, {"approved"})
+                    decision_key = "owner_decision_path"
+                    expected_decision_path = "04_sample/owner_sample_decision.json"
+                else:
+                    result.require(
+                        source.get("customer_decision_path") == "04_sample/customer_sample_decision.json",
+                        "customer approved-sample style source must reference customer_sample_decision.json",
+                    )
+                    check_customer_sample_decision(order_dir, result, {"approved"})
+                    decision_key = "customer_decision_path"
+                    expected_decision_path = "04_sample/customer_sample_decision.json"
                 approved_reference = load_json(
                     sample_dir / "approved_sample_reference.json",
                     result,
@@ -834,8 +1008,8 @@ def check_sample_accuracy(order_dir: Path, result: ValidationResult) -> None:
                 )
                 if approved_reference:
                     result.require(
-                        approved_reference.get("customer_decision_path") == "04_sample/customer_sample_decision.json",
-                        "approved sample reference must link customer_sample_decision.json",
+                        approved_reference.get(decision_key) == expected_decision_path,
+                        f"approved sample reference must link {expected_decision_path}",
                     )
                     approved_samples = approved_reference.get("approved_samples")
                     result.require(
@@ -1039,9 +1213,14 @@ def check_slide_job_payload(
         result.require(worker.get("one_slide_only") is True, f"{rel_label} worker must be limited to one slide")
         result.require(isinstance(worker.get("uses_image_generation"), bool), f"{rel_label} uses_image_generation must be boolean")
         result.require(isinstance(worker.get("image_generation_only"), bool), f"{rel_label} image_generation_only must be boolean")
+        result.require(isinstance(worker.get("must_generate_complete_slide"), bool), f"{rel_label} must_generate_complete_slide must be boolean")
+        result.require(isinstance(worker.get("must_render_all_visible_content"), bool), f"{rel_label} must_render_all_visible_content must be boolean")
+        result.require(worker.get("forbid_background_only") is True, f"{rel_label} background-only generation is forbidden")
         if output_mode == "image_first":
             result.require(worker.get("uses_image_generation") is True, f"{rel_label} image_first requires image generation")
             result.require(worker.get("image_generation_only") is True, f"{rel_label} image_first worker must return a full-slide image")
+            result.require(worker.get("must_generate_complete_slide") is True, f"{rel_label} image_first must generate the complete composed slide")
+            result.require(worker.get("must_render_all_visible_content") is True, f"{rel_label} image_first must render all visible slide content")
         elif output_mode == "hybrid":
             result.require(worker.get("uses_image_generation") is True, f"{rel_label} hybrid requires an image-generated visual layer")
             result.require(worker.get("image_generation_only") is False, f"{rel_label} hybrid also requires editable artifacts")
@@ -1672,6 +1851,7 @@ GATES: dict[str, Callable[[Path, ValidationResult], None]] = {
     "contract_accuracy": check_contract_accuracy,
     "decision": check_decision,
     "production": check_production,
+    "owner_sample_ready": check_owner_sample_ready,
     "sample_accuracy": check_sample_accuracy,
     "sample_delivery": check_sample_delivery,
     "sample_feedback": check_sample_feedback,

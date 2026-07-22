@@ -180,8 +180,26 @@ def create_order(args: argparse.Namespace) -> Path:
             requirements_path = order_dir / "03_requirements" / "requirements.json"
             if requirements_path.exists():
                 requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
-                for field_name in ["deadline", "price", "sample_required"]:
+                for field_name in ["deadline", "price"]:
                     requirements[field_name]["required"] = False
+                requirements["sample_required"] = {
+                    "value": True,
+                    "evidence": "owner_direct design workflow requires one complete-slide sample before full production",
+                    "confidence": "inferred",
+                    "required": True,
+                }
+                requirements["sample_scope"] = {
+                    "value": "one complete representative slide with real content",
+                    "evidence": "owner_direct sample-first default",
+                    "confidence": "inferred",
+                    "required": True,
+                }
+                requirements["output_mode"] = {
+                    "value": "image_first",
+                    "evidence": "owner_direct design default; non-image-first modes require explicit high-confidence editability evidence",
+                    "confidence": "inferred",
+                    "required": True,
+                }
                 requirements["delivery_target"] = {
                     "value": "owner_codex",
                     "evidence": "owner_direct execution profile",

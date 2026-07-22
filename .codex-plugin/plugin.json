@@ -1,6 +1,6 @@
 {
   "name": "ppt-order-autopilot",
-  "version": "0.2.0+codex.20260722014044",
+  "version": "0.2.0+codex.20260722053129",
   "description": "Agent-native PPT production and customer-order workflow with verified owner returns, per-slide workers, QA, delivery, and recovery.",
   "author": {
     "name": "Bronto-p"
@@ -19,6 +19,6 @@
       "Subagents",
       "Automations"
     ],
-    "defaultPrompt": "Run or resume PPT Order Autopilot. For an existing order run tools/autopilot.py next first; commit every completed state. Distinguish owner_direct from customer_order, use one slide subagent per page, and never claim owner completion without the finish receipt."
+    "defaultPrompt": "Run or resume PPT Order Autopilot. For an existing order run tools/autopilot.py next first; commit every completed state. Distinguish owner_direct from customer_order. Before full production, show one complete-slide sample with all real visible content and wait for owner approval; default to image-first and reject a background-only image. Then use one slide subagent per page and never claim owner completion without the finish receipt."
   }
 }

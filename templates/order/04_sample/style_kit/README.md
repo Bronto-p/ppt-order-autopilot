@@ -2,7 +2,7 @@
 
 `style_kit/` 是正稿生产前生成的视觉材料包。正稿每页 subagent 必须收到这里的真实图像附件，不能只读文字风格描述。
 
-没有客户样稿时也必须生成 style kit。`style_kit.json.source` 要记录它来自客户模板、源 PPT 还是 owner 已批准的风格 brief；禁止用“直接生产”绕过视觉基准。
+style kit 必须从 owner/customer 已批准的完整单页样稿提取；纯背景图或未审阅的内部 style anchor 不能作为批准来源。`style_kit.json.source` 要记录样稿、决定文件和预览 hash。
 
 建议产物：
 

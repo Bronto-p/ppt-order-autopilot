@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner Sample Decision",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "order_id",
+    "status",
+    "manifest_path",
+    "manifest_sha256",
+    "evidence_text",
+    "decided_at"
+  ],
+  "properties": {
+    "decision_id": {"type": "string", "minLength": 1},
+    "approval_id": {"type": "string", "minLength": 1},
+    "order_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["approved", "revision_requested"]},
+    "manifest_path": {"const": "04_sample/owner_sample_manifest.json"},
+    "manifest_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "evidence_text": {"type": "string", "minLength": 1},
+    "requested_changes": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "decided_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "approved"}}},
+      "then": {"required": ["approval_id"]}
+    },
+    {
+      "if": {"properties": {"status": {"const": "revision_requested"}}},
+      "then": {"required": ["requested_changes"], "properties": {"requested_changes": {"minItems": 1}}}
+    }
+  ],
+  "additionalProperties": false
+}

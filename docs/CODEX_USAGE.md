@@ -16,7 +16,7 @@ You do not need WeCom config to begin an attachment-only order. Codex may analyz
 
 ### Make or edit a deck for me
 
-Attach a file or point to an existing workspace file, then say what result to return. Codex uses `execution_mode=owner_direct`; it does not ask for customer price, WeCom contact, customer deadline, sample-send permission, or final-send permission unless the request actually involves a customer side effect.
+Attach a file or point to an existing workspace file, then say what result to return. Codex uses `execution_mode=owner_direct`; it does not ask for customer price, WeCom contact, customer deadline, customer sample-send permission, or final-send permission unless the request actually involves a customer side effect. For design work it does pause once to show you a complete-slide visual sample before producing the rest of the deck.
 
 ```text
 Use PPT Order Autopilot to beautify this deck and return the finished PPTX to me.
@@ -57,12 +57,12 @@ Codex reads state, events, approvals, file hashes, and side-effect ledgers. It d
 
 ## When Codex Asks You
 
-Codex should ask only for decisions that affect the customer or for evidence it cannot safely infer:
+Codex should ask only for high-impact decisions or evidence it cannot safely infer:
 
-1. One-time WeCom identity and send permissions.
-2. Accept/reject, price, deadline, scope, or the exact missing-question message.
-3. Permission to send a sample.
-4. Permission to send final files.
+1. Approval or revision of the complete single-slide sample shown in Codex for `owner_direct` design work.
+2. One-time WeCom identity and send permissions.
+3. Accept/reject, price, deadline, scope, or the exact missing-question message.
+4. Permission to send a customer sample or final files.
 5. Major revision, extra pages, style reset, or payment decision.
 6. Ambiguous customer feedback, source truth, required asset, contact identity, or exhausted automatic repair attempts.
 
@@ -72,9 +72,9 @@ Every request should arrive as one decision card with the Agent's recommendation
 
 ## What Runs Without Asking
 
-Chat capture, attachment download, OCR, indexing, requirements extraction, conflict detection, production planning, style-kit construction, per-slide dispatch, image generation, internal QA, bounded repair, assembly, export, file hashing, and delivery-message drafting are automatic.
+Chat capture, attachment download, OCR, indexing, requirements extraction, conflict detection, sample planning/generation/QA, production planning, style-kit construction, per-slide dispatch, image generation, internal QA, bounded repair, assembly, export, file hashing, and delivery-message drafting are automatic. Owner-direct design work stops after displaying the first complete-slide sample; the remaining pages start only after approval bound to that preview hash.
 
-Each slide is a separate subagent job. The parent Agent supplies deck-level and local context, keeps all attempts, accepts or rejects the result, runs cross-slide QA, and assembles the final deck.
+Each slide is a separate subagent job. In `image_first`, that job asks the image model for the entire page with all visible content—not a background layer for the parent to finish. The parent Agent supplies deck-level and local context, keeps all attempts, accepts or rejects the result, runs cross-slide QA, applies only approved locked chrome, and assembles the final deck.
 
 Explicitly attaching the plugin and asking it to produce slides authorizes this declared subagent workflow. If that capability is unavailable, Codex must stop before production instead of silently replacing it with a generic presentation builder.
 

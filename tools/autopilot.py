@@ -18,7 +18,12 @@ from typing import Any
 from validate_order import GATES, ValidationResult, sha256_file
 
 
-OWNER_ONLY_STATES = {"OWNER_RETURN_READY", "OWNER_RETURNED"}
+OWNER_ONLY_STATES = {
+    "OWNER_SAMPLE_PRODUCTION",
+    "OWNER_SAMPLE_REVIEW",
+    "OWNER_RETURN_READY",
+    "OWNER_RETURNED",
+}
 OWNER_DIRECT_FORBIDDEN_STATES = {
     "SCHEDULED_ASK",
     "ASK_SENT",
@@ -128,10 +133,13 @@ def validate_required_artifacts(order_dir: Path, definition: dict[str, Any], sta
         raise SystemExit(f"{state_name} is missing required artifacts: {', '.join(missing)}")
 
 
-def filtered_next_states(mode: str, allowed: list[Any]) -> list[str]:
+def filtered_next_states(mode: str, current: str, allowed: list[Any]) -> list[str]:
     states = [value for value in allowed if isinstance(value, str)]
     if mode == "owner_direct":
-        return [value for value in states if value not in OWNER_DIRECT_FORBIDDEN_STATES]
+        filtered = [value for value in states if value not in OWNER_DIRECT_FORBIDDEN_STATES]
+        if current == "DIRECT_PRODUCTION_ALLOWED":
+            filtered = [value for value in filtered if value != "FULL_PRODUCTION"]
+        return filtered
     return [value for value in states if value not in OWNER_ONLY_STATES]
 
 
@@ -147,7 +155,7 @@ def next_step(order_dir: Path) -> None:
         validate_gate(order_dir, gate)
     validate_required_artifacts(order_dir, definition, str(current))
     mode = state.get("execution_mode", "customer_order")
-    allowed = filtered_next_states(mode, definition.get("allowed_next", []))
+    allowed = filtered_next_states(mode, str(current), definition.get("allowed_next", []))
     payload = {
         "order_id": state.get("order_id"),
         "execution_mode": mode,
@@ -177,7 +185,11 @@ def commit(order_dir: Path, target: str, actor: str) -> None:
     target_definition = definitions.get(target)
     if not isinstance(current_definition, dict) or not isinstance(target_definition, dict):
         raise SystemExit(f"undefined transition: {current} -> {target}")
-    allowed = filtered_next_states(state.get("execution_mode", "customer_order"), current_definition.get("allowed_next", []))
+    allowed = filtered_next_states(
+        state.get("execution_mode", "customer_order"),
+        str(current),
+        current_definition.get("allowed_next", []),
+    )
     if target not in allowed:
         raise SystemExit(f"transition not allowed for this execution profile: {current} -> {target}")
     gate = target_definition.get("validation_gate", "base")

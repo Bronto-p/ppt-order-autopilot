@@ -4,7 +4,7 @@ PPT 生产层的目标不是“能生成一套 PPT”，而是让每一页 subag
 
 ## Core Rules
 
-1. 每页必须有可全尺寸检查的 rendered preview。`image_first` 由生图模型生成完整 canvas；`hybrid` 由生图模型生成视觉层并叠加可编辑内容；native/editable 模式按需生成局部视觉资产并保留可编辑结构。
+1. 每页必须有可全尺寸检查的 rendered preview。设计型任务默认 `image_first`，由生图模型一次生成包含全部可见文字、图形和构图的完整 canvas；纯背景或“稍后加文字”的 visual layer 禁止通过。只有明确且高置信的可编辑性/模板/图表要求才能选择 `hybrid`、native 或 editable 模式。
 2. 父 agent 不直接做页面，只负责 contract、style kit、job packaging、dispatch、QA 和 assembly。
 3. 每个 subagent 只做一页。
 4. 每个 subagent 的 job 必须 self-contained。
@@ -16,7 +16,7 @@ PPT 生产层的目标不是“能生成一套 PPT”，而是让每一页 subag
 10. required image 无法传入所选 backend 时，必须 blocker，不能 text-only fallback。
 11. 每次派发和修复必须保留 attempt snapshot；不得覆盖失败结果或让 worker 自行宣布 accepted。
 12. 自动修复最多三次，缺素材和内容冲突不允许用重试掩盖。
-13. `sample_required=false` 只跳过客户样稿，不跳过 style kit；style kit 必须来自客户模板、源 PPT 或已批准 style brief。
+13. owner-direct 设计任务必须先展示一张完整单页样稿并获得绑定 preview hash 的批准。客户样稿发送仍使用独立的发送和反馈 gate。
 
 ## Production Flow
 

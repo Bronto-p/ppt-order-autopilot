@@ -371,6 +371,9 @@
         "one_slide_only",
         "uses_image_generation",
         "image_generation_only",
+        "must_generate_complete_slide",
+        "must_render_all_visible_content",
+        "forbid_background_only",
         "must_not_use_text_only_fallback",
         "if_required_image_missing"
       ],
@@ -389,6 +392,15 @@
         },
         "image_generation_only": {
           "type": "boolean"
+        },
+        "must_generate_complete_slide": {
+          "type": "boolean"
+        },
+        "must_render_all_visible_content": {
+          "type": "boolean"
+        },
+        "forbid_background_only": {
+          "const": true
         },
         "must_not_use_text_only_fallback": {
           "const": true

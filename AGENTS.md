@@ -22,6 +22,8 @@ Operational rules:
 - Before an order exists, use `inbox/{inquiry_id}/` and `ledgers/automation_state.json`.
 - Once the chat reveals enough identity for an order, initialize `orders/{order_id}_{topic}/`, promote the inquiry artifacts, and continue from order state.
 - Use one subagent per slide. The parent agent owns orchestration, state, packaging, QA, repair decisions, assembly, and reporting.
+- For owner-direct design work, first generate one representative complete slide with real content, show it in Codex, and stop at `OWNER_SAMPLE_REVIEW`. Do not treat a background, moodboard, blank template, or style anchor as the sample.
+- Design/beautify/redesign defaults to `image_first`. Each worker must generate the whole page with all visible content; inferred `hybrid` and background-only visual layers are forbidden unless an explicit high-confidence editability requirement selects another mode.
 - Explicitly invoking this plugin and asking it to produce slides is an explicit request for its declared one-slide-per-subagent capability. If unavailable, stop before production instead of substituting a generic deck builder.
 - Do not preload all skills, docs, schemas, raw chats, or customer files. Load one stage skill and its direct inputs at a time. A slide worker receives only its immutable slide bundle.
 - If continuous monitoring is requested, maintain one workspace-level Codex Automation and persist its identity in `ledgers/automation_state.json`; never create one automation per order.
