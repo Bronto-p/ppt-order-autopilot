@@ -4,7 +4,7 @@
 
 This is the operational entrypoint for a capable AI agent. The agent is expected to use reasoning, Computer Use, subagents, image generation, filesystem tools, and presentation/PDF tools. Local Python utilities exist for deterministic initialization and validation; they are not the orchestrator.
 
-The user does not prepare an order folder. The agent begins from WeCom or Codex attachments, discovers the order, creates its runtime artifacts, and proceeds until a human commitment gate or a real blocker.
+The user does not prepare an order folder. The agent begins from WeCom, Codex attachments, or an explicitly named workspace file, creates runtime artifacts, and proceeds until a human commitment gate, verified owner return, closeout, or a real blocker.
 
 ## 1. Bootstrap
 
@@ -49,6 +49,12 @@ Choose one intake source from the user's request:
 
 - `wecom`: discover the order in the allowed WeCom chat.
 - `codex_attachment`: ingest files attached to the Codex task. The agent copies them into staging and builds the attachment index; the user never prepares a repository folder.
+- `workspace_file`: ingest a readable workspace file explicitly identified by the user. Record its original relative path and hash; do not call it an attachment.
+
+Choose one execution profile:
+
+- `owner_direct`: the owner asks Codex to make/edit a deck and return it in Codex. No customer commitment or external-send gate is implied.
+- `customer_order`: the workflow reads or commits to a customer and retains all business/send approvals.
 
 For each outbound ask, create:
 
@@ -64,7 +70,7 @@ An inquiry ID must be deterministic from contact plus the outbound message ledge
 
 Store pre-order screenshots and downloads here. After a reply reveals the customer topic or a stable fallback title, call `tools/init_order.py --with-templates`, move the staged artifacts into the matching order folders, write a promotion event to both ledgers, and set `active_order_id`.
 
-For `codex_attachment`, load `codex-attachment-intake`. It derives a deterministic inquiry ID from the exact prompt plus sorted attachment names/hashes. The source message ID is `codex_prompt_{source_digest[:12]}` and is explicitly a Codex evidence ID, not a fabricated WeCom ID. Copy attachments into `downloads/`, set `source_type=codex_attachment`, record `source_attachment_paths`, and promote once the files or the user's prompt reveal a stable topic. Do not fabricate WeCom screenshots, OCR, senders, or coverage. If later delivery must go through WeCom, collect the live contact configuration only at that external-action gate.
+For `codex_attachment` or `workspace_file`, load `codex-attachment-intake`. Derive a deterministic inquiry ID from the exact prompt, source type, and sorted file names/hashes; workspace sources also include their relative source paths. Copy files into `downloads/`, record the exact source type and paths, and promote once the prompt/files reveal a stable topic. Do not fabricate WeCom screenshots, OCR, senders, coverage, or attachment provenance. If later delivery must go through WeCom, collect live contact configuration only at that external-action gate.
 
 If one reply contains multiple distinct customer orders, create one order per distinct scope and preserve the shared inquiry evidence in each order index. Set the first runnable order as `active_order_id` and append the rest to `pending_order_ids`. When the active order reaches an owner gate, move its ID to `waiting_order_ids` before rotating to the next pending order. An owner reply names/binds its order ID, removes it from waiting, and makes it active when safe. Closed orders leave all queues. Never process two orders concurrently under one lock.
 
@@ -72,15 +78,16 @@ If one reply contains multiple distinct customer orders, create one order per di
 
 At every wake or resume:
 
-1. Read live config and `ledgers/automation_state.json`.
-2. Reconcile pending external side effects against `ui_actions.jsonl` and `sent_messages.jsonl`.
-3. If there is no active order, resume the scheduled inquiry or reply-check branch.
-4. If there is an active order, read its `state.json`, latest events, approvals, and current state definition in `configs/state_machine.json`.
-5. Verify required artifacts for the current state.
-6. Select exactly one next skill/action.
-7. Load that skill and only its input schemas/templates.
-8. Execute, validate the resulting gate, append an event, and transition atomically.
-9. Continue without asking the owner unless the next state requires approval or the skill returned a hard blocker.
+1. For an existing order, run `python3 tools/autopilot.py next <order_dir>`; do not infer the current step from chat.
+2. Read live config and `ledgers/automation_state.json`.
+3. Reconcile pending external side effects against `ui_actions.jsonl` and `sent_messages.jsonl`.
+4. If there is no active order, resume the scheduled inquiry or reply-check branch.
+5. If there is an active order, read its `state.json`, latest events, approvals, and current state definition in `configs/state_machine.json`.
+6. Verify required artifacts for the current state.
+7. Select exactly one next skill/action.
+8. Load that skill and only its input schemas/templates.
+9. Execute, then run `python3 tools/autopilot.py commit <order_dir> --to <STATE>` to validate, append an event, and transition atomically.
+10. Continue without asking the owner unless the next state requires approval or the skill returned a hard blocker.
 
 Never rely on the parent chat as the source of truth. Chat is for owner decisions; state and artifacts are for execution.
 
@@ -98,13 +105,16 @@ The parent retains the production contract, deck story, style kit index, slide r
 | --- | --- |
 | Open WeCom, locate contact, type, scroll, download, attach, send | Computer Use using `wecom-computer-use-operator` |
 | Stage files attached to the Codex task and promote them into an order | `codex-attachment-intake` |
+| Stage an explicitly named workspace file | `codex-attachment-intake` with `source_type=workspace_file` |
 | Interpret chat and customer files | Current agent using `wecom-chat-recorder` and `ppt-order-briefing` |
 | Decide next business step | Current agent using `ppt-order-decision` and owner gates |
-| Generate sample/final slides | One subagent per slide with the selected image-generation backend |
+| Generate sample/final slides | One subagent per slide with the contract-selected backend and output mode |
 | Inspect images and cross-slide consistency | Parent agent using visual inspection and QA contracts |
 | Assemble PPTX/PDF and verify exports | Presentation/PDF tooling selected by production core |
 
 If a required capability is unavailable, record a blocker. Do not silently substitute a method forbidden by the active contract.
+
+Explicit plugin invocation plus a request to produce slides is explicit authorization for the plugin's declared one-slide-per-subagent capability. It does not authorize any customer-facing side effect.
 
 ## 6. Recovery and Idempotency
 
@@ -157,8 +167,9 @@ The automation run is complete only when:
 - it is blocked with a specific required action and evidence;
 - the no-reply schedule has ended; or
 - the order is closed with delivery receipt and closeout artifacts.
+- an `owner_direct` order has passed `autopilot.py finish --target owner` and reached `OWNER_RETURNED`.
 
-Every final report must name the active inquiry/order, current state, completed artifacts, next action, and whether owner approval is required.
+Every final report must name the active inquiry/order, current state, completed artifacts, next action, and whether owner approval is required. An owner-direct completion must include the generated `receipt_id`; without it, report the actual blocker instead of claiming success.
 
 ## 9. Codex Lifecycle
 

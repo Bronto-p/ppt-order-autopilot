@@ -19,7 +19,9 @@
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "base",
+      "required_skill": "ppt-business-orchestrator"
     },
     "DIRECT_INTAKE_STAGED": {
       "allowed_next": [
@@ -29,7 +31,9 @@
       "required_artifacts": [
         "02_attachments_raw/attachment_index.jsonl"
       ],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "chat_capture",
+      "required_skill": "codex-attachment-intake"
     },
     "SCHEDULED_ASK": {
       "allowed_next": [
@@ -194,19 +198,24 @@
         "01_chat/message_index.jsonl",
         "02_attachments_raw/attachment_index.jsonl"
       ],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "chat_capture",
+      "required_skill": "ppt-order-briefing"
     },
     "EXTRACTING_ORDER_BRIEF": {
       "allowed_next": [
         "NEEDS_MISSING_QUESTIONS",
         "READY_FOR_OWNER_DECISION",
+        "DIRECT_PRODUCTION_ALLOWED",
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
         "03_requirements/requirements.json",
         "03_requirements/order_brief.md"
       ],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "briefing",
+      "required_skill": "ppt-order-briefing"
     },
     "NEEDS_MISSING_QUESTIONS": {
       "allowed_next": [
@@ -274,7 +283,9 @@
         "03_requirements/production_contract.json",
         "00_state/approvals.jsonl"
       ],
-      "requires_owner_approval": true
+      "requires_owner_approval": false,
+      "validation_gate": "production",
+      "required_skill": "ppt-production-contract-builder"
     },
     "SAMPLE_PRODUCTION": {
       "allowed_next": [
@@ -377,18 +388,49 @@
         "04_sample/style_kit/style_anchor.png",
         "04_sample/style_kit/template_master.png"
       ],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "slide_jobs",
+      "required_skill": "ppt-production-core"
     },
     "FULL_QA": {
       "allowed_next": [
         "DELIVERY_READY",
+        "OWNER_RETURN_READY",
         "FAILED_BLOCKED"
       ],
       "required_artifacts": [
         "05_production/visual_qa_result.json",
         "06_qa/qa_result.json"
       ],
-      "requires_owner_approval": false
+      "requires_owner_approval": false,
+      "validation_gate": "qa",
+      "required_skill": "ppt-qa-delivery"
+    },
+    "OWNER_RETURN_READY": {
+      "allowed_next": [
+        "OWNER_RETURNED",
+        "REVISION_LOOP",
+        "FAILED_BLOCKED"
+      ],
+      "required_artifacts": [
+        "06_qa/qa_result.json",
+        "07_delivery/owner_return_manifest.json"
+      ],
+      "requires_owner_approval": false,
+      "validation_gate": "owner_return_ready",
+      "required_skill": "ppt-qa-delivery"
+    },
+    "OWNER_RETURNED": {
+      "allowed_next": [
+        "REVISION_LOOP"
+      ],
+      "required_artifacts": [
+        "07_delivery/owner_return_manifest.json",
+        "07_delivery/owner_return_receipt.json"
+      ],
+      "requires_owner_approval": false,
+      "validation_gate": "owner_returned",
+      "required_skill": "ppt-business-orchestrator"
     },
     "DELIVERY_READY": {
       "allowed_next": [

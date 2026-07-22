@@ -5,12 +5,14 @@
   "required": [
     "job_id",
     "slide_no",
+    "output_mode",
     "accepted_attempt",
     "status",
     "raw_output_image",
     "raw_output_sha256",
     "final_output_image",
     "final_output_sha256",
+    "editable_artifacts",
     "locked_chrome",
     "finalized_at"
   ],
@@ -22,6 +24,14 @@
     "slide_no": {
       "type": "integer",
       "minimum": 1
+    },
+    "output_mode": {
+      "enum": [
+        "image_first",
+        "hybrid",
+        "template_native",
+        "editable_reconstruction"
+      ]
     },
     "accepted_attempt": {
       "type": "integer",
@@ -49,6 +59,19 @@
     "final_output_sha256": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "editable_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "role"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "role": {"enum": ["native_slide", "editable_layer_spec", "chart_data", "table_data", "speaker_notes"]}
+        },
+        "additionalProperties": false
+      }
     },
     "locked_chrome": {
       "type": "object",

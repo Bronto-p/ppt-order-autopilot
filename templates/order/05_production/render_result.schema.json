@@ -6,8 +6,10 @@
     "job_id",
     "attempt",
     "slide_no",
+    "output_mode",
     "status",
     "output_image",
+    "editable_artifacts",
     "input_images_seen",
     "asset_fidelity",
     "style_match",
@@ -28,6 +30,14 @@
       "type": "integer",
       "minimum": 1
     },
+    "output_mode": {
+      "enum": [
+        "image_first",
+        "hybrid",
+        "template_native",
+        "editable_reconstruction"
+      ]
+    },
     "status": {
       "enum": [
         "success",
@@ -40,6 +50,19 @@
         "string",
         "null"
       ]
+    },
+    "editable_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "role"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "role": {"enum": ["native_slide", "editable_layer_spec", "chart_data", "table_data", "speaker_notes"]}
+        },
+        "additionalProperties": false
+      }
     },
     "input_images_seen": {
       "type": "array",

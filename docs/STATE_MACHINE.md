@@ -58,6 +58,24 @@ requires_owner_approval
 
 orchestrator 每次改状态前都要验证旧状态是否允许转到新状态，并确认所需产物和 approval 已存在。
 
+状态不得由 Agent 手工跳写。已有订单先运行 `tools/autopilot.py next`，完成阶段后用 `commit --to <STATE>`；owner-direct 交付必须用 `finish --target owner`。
+
+## Owner-direct 短路径
+
+```text
+IDLE
+  -> DIRECT_INTAKE_STAGED
+  -> BUILDING_TRANSCRIPT
+  -> EXTRACTING_ORDER_BRIEF
+  -> DIRECT_PRODUCTION_ALLOWED
+  -> FULL_PRODUCTION
+  -> FULL_QA
+  -> OWNER_RETURN_READY
+  -> OWNER_RETURNED
+```
+
+用户 exact prompt 可记录为 `owner_direct_instruction`，只覆盖内部生产范围和 Codex return。`OWNER_RETURNED` 要求 verification receipt；它不允许客户消息、contact 或 send approval 字段。
+
 ## 2. 询单分支
 
 ```text

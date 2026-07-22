@@ -1,7 +1,7 @@
 {
   "name": "ppt-order-autopilot",
-  "version": "0.2.0",
-  "description": "Agent-native PPT order intake, production, QA, delivery, and recovery workflow for Codex.",
+  "version": "0.2.0+codex.20260722014044",
+  "description": "Agent-native PPT production and customer-order workflow with verified owner returns, per-slide workers, QA, delivery, and recovery.",
   "author": {
     "name": "Bronto-p"
   },
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "PPT Order Autopilot",
-    "shortDescription": "Run PPT orders from intake through delivery gates",
-    "longDescription": "A progressive-disclosure Codex plugin for WeCom or attachment intake, owner approval gates, one-slide-per-subagent image production, deterministic locked chrome, QA, recovery, and delivery.",
+    "shortDescription": "Run verified PPT jobs and customer orders",
+    "longDescription": "A progressive-disclosure Codex plugin for direct owner production, workspace/Codex/WeCom intake, one-slide-per-subagent image and editable modes, deterministic locked chrome, enforced stage commits, QA, recovery, and external delivery gates.",
     "developerName": "Bronto-p",
     "category": "Productivity",
     "capabilities": [
@@ -19,6 +19,6 @@
       "Subagents",
       "Automations"
     ],
-    "defaultPrompt": "Run or resume PPT Order Autopilot from durable state. Reconcile side effects first, load only the current stage skill, and continue until an owner gate, hard blocker, or closeout."
+    "defaultPrompt": "Run or resume PPT Order Autopilot. For an existing order run tools/autopilot.py next first; commit every completed state. Distinguish owner_direct from customer_order, use one slide subagent per page, and never claim owner completion without the finish receipt."
   }
 }

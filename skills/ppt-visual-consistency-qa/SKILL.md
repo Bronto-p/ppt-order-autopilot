@@ -7,7 +7,7 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 
 ## Purpose
 
-在 assembly 前检查 image-based slides 是否真正符合样稿锚点、模板母版、导航条和客户资产 fidelity 要求。
+在 assembly 前检查所有 output mode 的页面是否符合样稿/源稿锚点、模板母版、导航条、可编辑性和客户资产 fidelity 要求。
 
 ## Inputs
 
@@ -39,6 +39,9 @@ description: "PPT 视觉一致性质检层。检查 style drift、asset fidelity
 - Locked logo/footer/page-number regions stay stable.
 - Chinese text is readable.
 - Worker result has no blockers.
+- Source text/data changes stay inside `content_change_policy`.
+- Hybrid/native modes include their required editable artifacts and rendered preview.
+- Composition is presentation-quality: reject generic UI-card grids, unexplained empty space, missing subject visuals, weak hierarchy, and invented decorative copy.
 
 ## Hard Rules
 

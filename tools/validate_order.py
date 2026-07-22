@@ -12,11 +12,18 @@ from typing import Any, Callable
 
 from PIL import Image, ImageChops, ImageDraw
 
+from bootstrap_runtime import ledger_root
+
 
 ALLOWED_REQUIREMENT_CONFIDENCE = {"high", "medium", "low", "inferred", "missing"}
 ALLOWED_ATTACHMENT_STATUS = {"success", "failed", "skipped"}
 ALLOWED_QA_STATUS = {"pass", "blocked", "failed"}
 ALLOWED_WORKER_REASONING = {"medium", "high"}
+ALLOWED_EXECUTION_MODES = {"customer_order", "owner_direct"}
+ALLOWED_INTAKE_SOURCES = {"wecom", "codex_attachment", "workspace_file"}
+ALLOWED_OUTPUT_MODES = {"image_first", "hybrid", "template_native", "editable_reconstruction"}
+ALLOWED_PRODUCTION_MODES = ALLOWED_OUTPUT_MODES | {"mixed"}
+IMAGE_GENERATION_MODES = {"image_first", "hybrid"}
 ALLOWED_STYLE_SOURCES = {"approved_sample", "customer_template", "source_deck", "approved_style_brief"}
 STYLE_ANCHOR_ROLES = {"approved_sample_style_anchor", "style_anchor"}
 TEMPLATE_ROLES = {"template_reference", "template_master"}
@@ -167,9 +174,22 @@ def order_id_from_state(order_dir: Path, result: ValidationResult) -> str | None
     return order_id if isinstance(order_id, str) and order_id else None
 
 
+def load_order_state(order_dir: Path, result: ValidationResult) -> dict[str, Any] | None:
+    return load_json(order_dir / "00_state" / "state.json", result, "00_state/state.json")
+
+
+def execution_mode(order_dir: Path, result: ValidationResult) -> str | None:
+    state = load_order_state(order_dir, result)
+    if not state:
+        return None
+    mode = state.get("execution_mode", "customer_order")
+    result.require(mode in ALLOWED_EXECUTION_MODES, "state.json execution_mode is invalid")
+    return mode if mode in ALLOWED_EXECUTION_MODES else None
+
+
 def approved_records(order_dir: Path, result: ValidationResult) -> list[dict[str, Any]]:
     local_records = load_jsonl(order_dir / "00_state" / "approvals.jsonl", result, "00_state/approvals.jsonl", False)
-    global_path = project_root() / "ledgers" / "approvals.jsonl"
+    global_path = ledger_root(project_root()) / "approvals.jsonl"
     global_records = load_jsonl(global_path, result, "ledgers/approvals.jsonl", False) if global_path.exists() else []
     order_id = order_id_from_state(order_dir, result)
     return [
@@ -233,6 +253,12 @@ def check_base(order_dir: Path, result: ValidationResult) -> None:
         for key in ["order_id", "state", "created_at", "updated_at"]:
             result.require(key in state, f"state.json missing key: {key}")
         result.require(state.get("state_version") == 1, "state.json state_version must be 1")
+        mode = state.get("execution_mode", "customer_order")
+        result.require(mode in ALLOWED_EXECUTION_MODES, "state.json execution_mode is invalid")
+        intake_source = state.get("intake_source")
+        result.require(intake_source is None or intake_source in ALLOWED_INTAKE_SOURCES, "state.json intake_source is invalid")
+        expected_target = "owner_codex" if mode == "owner_direct" else "customer_wecom"
+        result.require(state.get("delivery_target", expected_target) == expected_target, "state.json delivery_target conflicts with execution_mode")
         check_state_machine(order_dir, result, state)
     result.require((order_dir / "00_state" / "events.jsonl").exists(), "missing 00_state/events.jsonl")
 
@@ -247,14 +273,14 @@ def check_coverage(order_dir: Path, result: ValidationResult) -> None:
         return
     result.require(coverage.get("status") == "success", "coverage_result.json status must be success")
     source_type = coverage.get("source_type", "wecom")
-    result.require(source_type in {"wecom", "codex_attachment"}, "coverage_result.json source_type is invalid")
-    if source_type == "codex_attachment":
+    result.require(source_type in ALLOWED_INTAKE_SOURCES, "coverage_result.json source_type is invalid")
+    if source_type in {"codex_attachment", "workspace_file"}:
         result.require(
             is_nonempty_collection(coverage.get("source_attachment_paths")),
-            "Codex attachment intake requires source_attachment_paths",
+            "direct file intake requires source_attachment_paths",
         )
         for source_path in path_list(coverage.get("source_attachment_paths")):
-            result.require(rel_path_exists(order_dir, source_path), f"Codex source attachment does not exist: {source_path}")
+            result.require(rel_path_exists(order_dir, source_path), f"direct source file does not exist: {source_path}")
     else:
         result.require(isinstance(coverage.get("screens_captured"), int) and coverage["screens_captured"] > 0, "coverage must capture at least one screen")
         result.require(not is_empty_value(coverage.get("top_anchor")), "coverage_result.json missing top_anchor")
@@ -430,14 +456,27 @@ def deliverables_from_contract(order_dir: Path, result: ValidationResult) -> set
         result.require(not is_empty_value(approval_id), "production_contract.json approval.approval_id is required")
         if approval_id:
             result.require(
-                str(approval_id) in approval_ids(order_dir, result, {"accept_order", "approve_production"}),
+                str(approval_id)
+                in approval_ids(
+                    order_dir,
+                    result,
+                    {"accept_order", "approve_production", "owner_direct_instruction"},
+                ),
                 f"production approval_id not approved for production: {approval_id}",
             )
     return normalized
 
 
 def check_production(order_dir: Path, result: ValidationResult) -> None:
-    check_decision(order_dir, result)
+    mode = execution_mode(order_dir, result)
+    if mode == "owner_direct":
+        check_briefing(order_dir, result)
+        result.require(
+            bool(approval_ids(order_dir, result, {"owner_direct_instruction", "approve_production"})),
+            "owner_direct production requires an order-scoped owner instruction approval",
+        )
+    else:
+        check_decision(order_dir, result)
     failed = failed_attachments(order_dir, result)
     result.require(not failed, "failed attachment downloads block production")
     deliverables_from_contract(order_dir, result)
@@ -490,7 +529,7 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
     method = contract.get("method")
     result.require(isinstance(method, dict), "production_contract.method must be an object")
     if isinstance(method, dict):
-        result.require(method.get("production_mode") == "image_model_full_slide", "production_mode must be image_model_full_slide")
+        result.require(method.get("production_mode") in ALLOWED_PRODUCTION_MODES, "production_mode is invalid")
         result.require(method.get("subagents_required") is True, "subagents_required must be true")
         result.require(method.get("default_reasoning_level") in ALLOWED_WORKER_REASONING, "default reasoning must be medium/high")
 
@@ -541,8 +580,15 @@ def check_contract_accuracy(order_dir: Path, result: ValidationResult) -> None:
             result.require(slide_no not in seen_slide_numbers, f"duplicate slide_no: {slide_no}")
             seen_slide_numbers.add(slide_no)
             label = f"slide {slide_no}"
-        for key in ["title", "page_type", "exact_content_source", "job_path"]:
+        for key in ["title", "page_type", "output_mode", "exact_content_source", "job_path"]:
             result.require(not is_empty_value(slide.get(key)), f"{label} missing {key}")
+        slide_output_mode = slide.get("output_mode")
+        result.require(slide_output_mode in ALLOWED_OUTPUT_MODES, f"{label} output_mode is invalid")
+        if isinstance(method, dict) and method.get("production_mode") != "mixed":
+            result.require(
+                slide_output_mode == method.get("production_mode"),
+                f"{label} output_mode must match deck production_mode unless it is mixed",
+            )
         content_source = safe_runtime_path(order_dir, slide.get("exact_content_source"), result, f"{label} exact_content_source")
         if content_source is not None:
             result.require(content_source.exists(), f"{label} exact_content_source does not exist")
@@ -870,6 +916,8 @@ def check_slide_job_payload(
         return
     result.require(job.get("job_id") == expected_job_id, f"{rel_label} job_id does not match slide_jobs.json")
     result.require(job.get("slide_no") == expected_slide_no, f"{rel_label} slide_no does not match slide_jobs.json")
+    output_mode = job.get("output_mode")
+    result.require(output_mode in ALLOWED_OUTPUT_MODES, f"{rel_label} output_mode is invalid")
     result.require(job.get("attempt") == 1, f"{rel_label} base job attempt must be 1")
     result.require(isinstance(job.get("max_attempts"), int) and 1 <= job["max_attempts"] <= 3, f"{rel_label} max_attempts must be 1-3")
     result.require(isinstance(job.get("deck_context"), dict) and bool(job.get("deck_context")), f"{rel_label} deck_context must be a non-empty object")
@@ -887,7 +935,17 @@ def check_slide_job_payload(
     backend_is_named = isinstance(backend, dict) and not is_empty_value(backend.get("selected_backend"))
     result.require(backend_is_named, f"{rel_label} backend must name selected_backend")
     if isinstance(backend, dict):
-        result.require(backend.get("mode") in {"reference_guided_generation", "image_edit"}, f"{rel_label} backend mode is invalid")
+        result.require(
+            backend.get("mode")
+            in {
+                "reference_guided_generation",
+                "image_edit",
+                "hybrid_assets",
+                "template_native",
+                "editable_reconstruction",
+            },
+            f"{rel_label} backend mode is invalid",
+        )
         result.require(backend.get("requires_image_inputs") is True, f"{rel_label} backend must support image inputs")
     qa_requirements = job.get("qa_requirements")
     result.require(isinstance(qa_requirements, list) and bool(qa_requirements), f"{rel_label} qa_requirements must not be empty")
@@ -978,7 +1036,17 @@ def check_slide_job_payload(
     if isinstance(worker, dict):
         result.require(worker.get("reasoning_level") in ALLOWED_WORKER_REASONING, f"{rel_label} worker reasoning must be medium/high")
         result.require(worker.get("reasoning_level") != "low", f"{rel_label} worker reasoning cannot be low")
-        result.require(worker.get("image_generation_only") is True, f"{rel_label} image_generation_only must be true")
+        result.require(worker.get("one_slide_only") is True, f"{rel_label} worker must be limited to one slide")
+        result.require(isinstance(worker.get("uses_image_generation"), bool), f"{rel_label} uses_image_generation must be boolean")
+        result.require(isinstance(worker.get("image_generation_only"), bool), f"{rel_label} image_generation_only must be boolean")
+        if output_mode == "image_first":
+            result.require(worker.get("uses_image_generation") is True, f"{rel_label} image_first requires image generation")
+            result.require(worker.get("image_generation_only") is True, f"{rel_label} image_first worker must return a full-slide image")
+        elif output_mode == "hybrid":
+            result.require(worker.get("uses_image_generation") is True, f"{rel_label} hybrid requires an image-generated visual layer")
+            result.require(worker.get("image_generation_only") is False, f"{rel_label} hybrid also requires editable artifacts")
+        else:
+            result.require(worker.get("image_generation_only") is False, f"{rel_label} editable modes cannot be image-generation-only")
         result.require(worker.get("must_not_use_text_only_fallback") is True, f"{rel_label} must not use text-only fallback")
         result.require(worker.get("if_required_image_missing") == "block", f"{rel_label} if_required_image_missing must be block")
         high_required_types = {"cover", "data", "timeline", "process", "old_ppt_redesign"}
@@ -986,6 +1054,20 @@ def check_slide_job_payload(
             result.require(worker.get("reasoning_level") == "high", f"{rel_label} requires high reasoning")
         if isinstance(input_images, list) and any(isinstance(img, dict) and img.get("role") == "strict_client_asset" for img in input_images):
             result.require(worker.get("reasoning_level") == "high", f"{rel_label} strict_client_asset requires high reasoning")
+
+    contract = load_production_contract(order_dir, result)
+    contract_slides = contract.get("slides", []) if isinstance(contract, dict) else []
+    matching_contract_slides = [
+        slide
+        for slide in contract_slides
+        if isinstance(slide, dict) and slide.get("slide_no") == expected_slide_no
+    ]
+    result.require(len(matching_contract_slides) == 1, f"{rel_label} must map to exactly one contract slide")
+    if len(matching_contract_slides) == 1:
+        result.require(
+            output_mode == matching_contract_slides[0].get("output_mode"),
+            f"{rel_label} output_mode differs from production contract",
+        )
 
 
 def check_slide_jobs(order_dir: Path, result: ValidationResult) -> None:
@@ -1135,6 +1217,34 @@ def check_slide_run_state(order_dir: Path, result: ValidationResult) -> None:
             result.require(slide.get("selected_source") == job_record.get("output_image"), f"slide_run_state slide {index} selected_source must be canonical final output")
 
 
+def check_editable_artifacts(
+    order_dir: Path,
+    artifacts: Any,
+    result: ValidationResult,
+    label: str,
+    required: bool,
+) -> None:
+    result.require(isinstance(artifacts, list), f"{label} editable_artifacts must be a list")
+    if not isinstance(artifacts, list):
+        return
+    if required:
+        result.require(bool(artifacts), f"{label} requires editable_artifacts for this output mode")
+    for index, artifact in enumerate(artifacts, start=1):
+        result.require(isinstance(artifact, dict), f"{label} editable artifact {index} must be an object")
+        if not isinstance(artifact, dict):
+            continue
+        path = safe_runtime_path(order_dir, artifact.get("path"), result, f"{label} editable artifact {index} path")
+        expected_sha = artifact.get("sha256")
+        result.require(
+            isinstance(expected_sha, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_sha),
+            f"{label} editable artifact {index} sha256 is invalid",
+        )
+        if path is not None:
+            result.require(path.exists(), f"{label} editable artifact {index} does not exist")
+            if path.exists() and isinstance(expected_sha, str):
+                result.require(sha256_file(path) == expected_sha, f"{label} editable artifact {index} sha256 mismatch")
+
+
 def check_render_results(order_dir: Path, result: ValidationResult) -> None:
     jobs_payload = load_slide_jobs(order_dir, result)
     if not jobs_payload:
@@ -1149,8 +1259,10 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         job_id = job_record.get("job_id")
         result_file = job_record.get("render_result_file")
         output_image = job_record.get("output_image")
+        job_path = safe_runtime_path(order_dir, job_record.get("job_file"), result, f"slide {slide_no} job_file")
+        job = load_json(job_path, result, str(job_record.get("job_file"))) if job_path is not None else None
         result.require(isinstance(result_file, str), f"slide {slide_no} missing render_result_file")
-        if not isinstance(result_file, str):
+        if not isinstance(result_file, str) or not job:
             continue
         render_path = safe_runtime_path(order_dir, result_file, result, f"slide {slide_no} render_result_file")
         if render_path is None:
@@ -1161,6 +1273,15 @@ def check_render_results(order_dir: Path, result: ValidationResult) -> None:
         result.require(render.get("job_id") == job_id, f"{result_file} job_id mismatch")
         result.require(isinstance(render.get("attempt"), int) and 1 <= render["attempt"] <= 3, f"{result_file} attempt is invalid")
         result.require(render.get("slide_no") == slide_no, f"{result_file} slide_no mismatch")
+        output_mode = render.get("output_mode")
+        result.require(output_mode == job.get("output_mode"), f"{result_file} output_mode differs from slide job")
+        check_editable_artifacts(
+            order_dir,
+            render.get("editable_artifacts", []),
+            result,
+            result_file,
+            output_mode != "image_first",
+        )
         result.require(render.get("status") == "success", f"{result_file} status must be success")
         result.require(not render.get("blockers"), f"{result_file} blockers must be empty")
         raw_output = render.get("output_image")
@@ -1216,6 +1337,15 @@ def check_finalizations(order_dir: Path, result: ValidationResult) -> None:
             continue
         result.require(finalization.get("job_id") == job_id, f"slide {slide_no} finalization job_id mismatch")
         result.require(finalization.get("slide_no") == slide_no, f"slide {slide_no} finalization slide_no mismatch")
+        output_mode = job.get("output_mode")
+        result.require(finalization.get("output_mode") == output_mode, f"slide {slide_no} finalization output_mode mismatch")
+        check_editable_artifacts(
+            order_dir,
+            finalization.get("editable_artifacts", []),
+            result,
+            f"slide {slide_no} finalization",
+            output_mode != "image_first",
+        )
         result.require(finalization.get("accepted_attempt") == render.get("attempt"), f"slide {slide_no} finalization attempt mismatch")
         run_slide = run_slides_by_job.get(job_id)
         result.require(isinstance(run_slide, dict), f"slide {slide_no} finalization has no slide_run_state record")
@@ -1459,6 +1589,44 @@ def check_delivery(order_dir: Path, result: ValidationResult) -> None:
     )
 
 
+def check_owner_return_ready(order_dir: Path, result: ValidationResult) -> None:
+    check_qa(order_dir, result)
+    result.require(execution_mode(order_dir, result) == "owner_direct", "owner return is only valid for owner_direct orders")
+    state = load_order_state(order_dir, result)
+    if state:
+        result.require(state.get("delivery_target") == "owner_codex", "owner return requires delivery_target=owner_codex")
+    manifest_path = order_dir / "07_delivery" / "owner_return_manifest.json"
+    manifest = load_json(manifest_path, result, "07_delivery/owner_return_manifest.json")
+    if not manifest:
+        return
+    result.require(manifest.get("order_id") == order_id_from_state(order_dir, result), "owner return order_id must match state.json")
+    result.require(manifest.get("target") == "owner_codex", "owner return target must be owner_codex")
+    for forbidden in ["contact_id", "approval_id", "message_path", "message_sha256"]:
+        result.require(forbidden not in manifest, f"owner return manifest must not contain customer-send field: {forbidden}")
+    qa_path = safe_runtime_path(order_dir, manifest.get("qa_result_path"), result, "owner return qa_result_path")
+    result.require(manifest.get("qa_result_path") == "06_qa/qa_result.json", "owner return must reference 06_qa/qa_result.json")
+    if qa_path is not None:
+        result.require(qa_path.exists(), "owner return QA result does not exist")
+        if qa_path.exists():
+            result.require(manifest.get("qa_result_sha256") == sha256_file(qa_path), "owner return QA result hash mismatch")
+    check_file_manifest(order_dir, result, manifest_path, "07_delivery/owner_return_manifest.json")
+
+
+def check_owner_returned(order_dir: Path, result: ValidationResult) -> None:
+    check_owner_return_ready(order_dir, result)
+    manifest_path = order_dir / "07_delivery" / "owner_return_manifest.json"
+    receipt_path = order_dir / "07_delivery" / "owner_return_receipt.json"
+    manifest = load_json(manifest_path, result, "07_delivery/owner_return_manifest.json")
+    receipt = load_json(receipt_path, result, "07_delivery/owner_return_receipt.json")
+    if not manifest or not receipt:
+        return
+    result.require(receipt.get("order_id") == order_id_from_state(order_dir, result), "owner return receipt order_id mismatch")
+    result.require(receipt.get("target") == "owner_codex", "owner return receipt target must be owner_codex")
+    result.require(receipt.get("manifest_path") == "07_delivery/owner_return_manifest.json", "owner return receipt manifest path is invalid")
+    result.require(receipt.get("manifest_sha256") == sha256_file(manifest_path), "owner return receipt manifest hash mismatch")
+    result.require(receipt.get("files") == manifest.get("files"), "owner return receipt files differ from verified manifest")
+
+
 def check_file_manifest(order_dir: Path, result: ValidationResult, path: Path, label: str) -> None:
     payload = load_json(path, result, label)
     if not payload:
@@ -1493,7 +1661,7 @@ def check_closeout(order_dir: Path, result: ValidationResult) -> None:
     payment = load_json(closeout_dir / "payment_status.json", result, "08_closeout/payment_status.json")
     if payment:
         result.require(payment.get("status") in {"unknown", "pending", "partial", "paid", "waived"}, "payment_status.json status is invalid")
-    sent_records = load_jsonl(project_root() / "ledgers" / "sent_messages.jsonl", result, "ledgers/sent_messages.jsonl", False)
+    sent_records = load_jsonl(ledger_root(project_root()) / "sent_messages.jsonl", result, "ledgers/sent_messages.jsonl", False)
     result.require(bool(sent_records), "closeout requires sent message ledger record")
 
 
@@ -1510,6 +1678,8 @@ GATES: dict[str, Callable[[Path, ValidationResult], None]] = {
     "slide_jobs": check_slide_jobs,
     "visual_qa": check_visual_qa,
     "qa": check_qa,
+    "owner_return_ready": check_owner_return_ready,
+    "owner_returned": check_owner_returned,
     "delivery": check_delivery,
     "closeout": check_closeout,
 }

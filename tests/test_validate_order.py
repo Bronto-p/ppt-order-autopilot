@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import unittest
@@ -12,15 +13,19 @@ from PIL import Image, ImageDraw
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ORDERS_ROOT = PROJECT_ROOT / "tmp" / "test-suite-orders"
+LEDGERS_ROOT = PROJECT_ROOT / "tmp" / "test-suite-ledgers"
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["PPT_AUTOPILOT_LEDGER_ROOT"] = str(LEDGERS_ROOT)
     return subprocess.run(
         ["python3", *args],
         cwd=PROJECT_ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        env=env,
     )
 
 
@@ -40,13 +45,9 @@ def sha256_file(path: Path) -> str:
 class ValidateOrderTests(unittest.TestCase):
     def setUp(self) -> None:
         shutil.rmtree(PROJECT_ROOT / "tmp", ignore_errors=True)
-        for name in ["automation_state.json", "inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
-            (PROJECT_ROOT / "ledgers" / name).unlink(missing_ok=True)
 
     def tearDown(self) -> None:
         shutil.rmtree(PROJECT_ROOT / "tmp", ignore_errors=True)
-        for name in ["automation_state.json", "inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
-            (PROJECT_ROOT / "ledgers" / name).unlink(missing_ok=True)
 
     def create_order(self) -> Path:
         result = run_tool(
@@ -154,6 +155,7 @@ class ValidateOrderTests(unittest.TestCase):
             "slide_no": 1,
             "title": "测试 PPT",
             "page_type": "content",
+            "output_mode": "image_first",
             "exact_content_source": "03_requirements/requirements.json",
             "required_asset_ids": ["style_anchor", "template_master", "page_family_content"],
         }
@@ -168,7 +170,7 @@ class ValidateOrderTests(unittest.TestCase):
                 "language": "zh-CN",
             },
             "method": {
-                "production_mode": "image_model_full_slide",
+                "production_mode": "image_first",
                 "subagents_required": True,
                 "default_reasoning_level": "high",
                 "same_backend_as_sample": True,
@@ -251,6 +253,7 @@ class ValidateOrderTests(unittest.TestCase):
                 "slide_no": 1,
                 "page_type": "content",
                 "title": "测试 PPT",
+                "output_mode": "image_first",
                 "deck_context": {
                     "deck_title": "测试 PPT",
                     "goal": "验证自动化生产",
@@ -295,6 +298,8 @@ class ValidateOrderTests(unittest.TestCase):
                 "qa_requirements": ["exact_content", "text_readability", "asset_fidelity", "style_match"],
                 "worker_policy": {
                     "reasoning_level": reasoning_level,
+                    "one_slide_only": True,
+                    "uses_image_generation": True,
                     "image_generation_only": True,
                     "must_not_use_text_only_fallback": True,
                     "if_required_image_missing": "block",
@@ -318,8 +323,8 @@ class ValidateOrderTests(unittest.TestCase):
     def test_order_initialization_bootstraps_global_runtime(self) -> None:
         self.create_order()
         for name in ["inquiries.jsonl", "orders.jsonl", "sent_messages.jsonl", "ui_actions.jsonl", "approvals.jsonl"]:
-            self.assertTrue((PROJECT_ROOT / "ledgers" / name).exists(), name)
-        automation_state = json.loads((PROJECT_ROOT / "ledgers" / "automation_state.json").read_text(encoding="utf-8"))
+            self.assertTrue((LEDGERS_ROOT / name).exists(), name)
+        automation_state = json.loads((LEDGERS_ROOT / "automation_state.json").read_text(encoding="utf-8"))
         self.assertEqual(automation_state["state"], "IDLE")
         self.assertIn("automation_binding", automation_state)
 
@@ -693,6 +698,7 @@ class ValidateOrderTests(unittest.TestCase):
             "slide_no": 1,
             "page_type": "content",
             "title": "测试 PPT",
+            "output_mode": "image_first",
             "deck_context": {"deck_title": "测试 PPT"},
             "local_context": {"slide_purpose": "测试"},
             "exact_content": {},
@@ -718,7 +724,7 @@ class ValidateOrderTests(unittest.TestCase):
             },
             "backend": {"selected_backend": "test-image-backend", "mode": "image_edit", "requires_image_inputs": True},
             "qa_requirements": ["exact_content", "text_readability", "style_match"],
-            "worker_policy": {"reasoning_level": "high", "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
+            "worker_policy": {"reasoning_level": "high", "one_slide_only": True, "uses_image_generation": True, "image_generation_only": True, "must_not_use_text_only_fallback": True, "if_required_image_missing": "block"},
         })
 
         result = run_tool("tools/validate_order.py", str(order_dir), "--gate", "slide_jobs")
@@ -881,6 +887,33 @@ class ValidateOrderTests(unittest.TestCase):
         self.assertTrue(receipt["locked_chrome"]["pixel_match"])
         self.assertEqual(receipt["final_output_sha256"], sha256_file(order_dir / output_rel))
 
+        editable_path = order_dir / "05_production" / "slide_jobs" / "slide_01" / "editable-layer.json"
+        editable_path.write_text("{}\n", encoding="utf-8")
+        manifest_path = editable_path.with_name("editable-artifacts.json")
+        write_json(
+            manifest_path,
+            [{"path": str(editable_path.relative_to(order_dir)), "role": "editable_layer_spec"}],
+        )
+        hybrid = run_tool(
+            "tools/composite_locked_chrome.py",
+            "--order-dir", str(order_dir),
+            "--job-id", "test-order:slide_01",
+            "--slide-no", "1",
+            "--accepted-attempt", "1",
+            "--variant-id", "section_test",
+            "--raw-image", str(raw_path.relative_to(order_dir)),
+            "--overlay-image", str(overlay_path.relative_to(order_dir)),
+            "--expected-overlay-sha256", sha256_file(overlay_path),
+            "--output-image", output_rel,
+            "--receipt", receipt_rel,
+            "--output-mode", "hybrid",
+            "--editable-artifacts-json", str(manifest_path.relative_to(order_dir)),
+            "--safe-box", "0", "10", "100", "50",
+        )
+        self.assertEqual(hybrid.returncode, 0, hybrid.stdout)
+        hybrid_receipt = json.loads((order_dir / receipt_rel).read_text(encoding="utf-8"))
+        self.assertEqual(hybrid_receipt["editable_artifacts"][0]["sha256"], sha256_file(editable_path))
+
         semitransparent = Image.new("RGBA", (100, 60), (0, 0, 0, 0))
         ImageDraw.Draw(semitransparent).rectangle((0, 0, 99, 9), fill=(240, 80, 20, 128))
         semitransparent.save(overlay_path)
@@ -933,12 +966,14 @@ class ValidateOrderTests(unittest.TestCase):
                 "job_id": "test-order:slide_01",
                 "attempt": 1,
                 "slide_no": 1,
+                "output_mode": "image_first",
                 "status": "success",
                 "output_image": "05_production/slide_jobs/slide_01/attempts/attempt_01/output.png",
                 "input_images_seen": ["style_anchor.png"],
                 "asset_fidelity": [],
                 "style_match": "pass",
                 "text_readability": "pass",
+                "editable_artifacts": [],
                 "blockers": [],
             },
         )
@@ -947,12 +982,14 @@ class ValidateOrderTests(unittest.TestCase):
             {
                 "job_id": "test-order:slide_01",
                 "slide_no": 1,
+                "output_mode": "image_first",
                 "accepted_attempt": 1,
                 "status": "pass",
                 "raw_output_image": "05_production/slide_jobs/slide_01/attempts/attempt_01/output.png",
                 "raw_output_sha256": sha256_file(raw_output),
                 "final_output_image": "05_production/origin_image/slide_01.png",
                 "final_output_sha256": sha256_file(order_dir / "05_production" / "origin_image" / "slide_01.png"),
+                "editable_artifacts": [],
                 "locked_chrome": {
                     "mode": "none",
                     "variant_id": None,

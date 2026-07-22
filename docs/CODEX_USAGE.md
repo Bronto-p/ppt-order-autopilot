@@ -14,6 +14,17 @@ You do not need WeCom config to begin an attachment-only order. Codex may analyz
 
 ## Start Modes
 
+### Make or edit a deck for me
+
+Attach a file or point to an existing workspace file, then say what result to return. Codex uses `execution_mode=owner_direct`; it does not ask for customer price, WeCom contact, customer deadline, sample-send permission, or final-send permission unless the request actually involves a customer side effect.
+
+```text
+Use PPT Order Autopilot to beautify this deck and return the finished PPTX to me.
+Use the plugin's one-slide-per-subagent workflow.
+```
+
+An explicitly named workspace file is recorded as `workspace_file`. A file attached to the message is `codex_attachment`. The file name or folder name does not decide whether the customer sample branch is required.
+
 ### Start from WeCom
 
 ```text
@@ -64,6 +75,10 @@ Every request should arrive as one decision card with the Agent's recommendation
 Chat capture, attachment download, OCR, indexing, requirements extraction, conflict detection, production planning, style-kit construction, per-slide dispatch, image generation, internal QA, bounded repair, assembly, export, file hashing, and delivery-message drafting are automatic.
 
 Each slide is a separate subagent job. The parent Agent supplies deck-level and local context, keeps all attempts, accepts or rejects the result, runs cross-slide QA, and assembles the final deck.
+
+Explicitly attaching the plugin and asking it to produce slides authorizes this declared subagent workflow. If that capability is unavailable, Codex must stop before production instead of silently replacing it with a generic presentation builder.
+
+For owner-direct work, every stage is committed through `tools/autopilot.py`. The final response is valid only after `finish --target owner` returns a receipt ID; returning a file in Codex does not authorize sending it to a customer.
 
 If navigation, logo, footer, or page numbers must stay fixed, slide workers generate the page body while leaving the locked regions clear. The parent then applies the approved transparent overlay and verifies its hash and pixels before cross-slide QA. This prevents independently generated pages from moving the navigation bar.
 

@@ -64,7 +64,13 @@
       ],
       "properties": {
         "production_mode": {
-          "const": "image_model_full_slide"
+          "enum": [
+            "image_first",
+            "hybrid",
+            "template_native",
+            "editable_reconstruction",
+            "mixed"
+          ]
         },
         "subagents_required": {
           "const": true
@@ -226,6 +232,7 @@
         "slide_no",
         "page_type",
         "title",
+        "output_mode",
         "exact_content_source",
         "required_asset_ids",
         "job_path"
@@ -252,6 +259,14 @@
         "title": {
           "type": "string",
           "minLength": 1
+        },
+        "output_mode": {
+          "enum": [
+            "image_first",
+            "hybrid",
+            "template_native",
+            "editable_reconstruction"
+          ]
         },
         "exact_content_source": {
           "type": "string",

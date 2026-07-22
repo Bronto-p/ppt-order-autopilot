@@ -14,6 +14,21 @@ from pathlib import Path
 from PIL import Image, ImageChops
 
 
+OUTPUT_MODES = {
+    "image_first",
+    "hybrid",
+    "template_native",
+    "editable_reconstruction",
+}
+EDITABLE_ARTIFACT_ROLES = {
+    "native_slide",
+    "editable_layer_spec",
+    "chart_data",
+    "table_data",
+    "speaker_notes",
+}
+
+
 def resolve_within(root: Path, relative_path: str) -> Path:
     candidate = Path(relative_path)
     if candidate.is_absolute():
@@ -84,6 +99,33 @@ def atomic_write_json(payload: dict[str, object], output_path: Path) -> None:
         temp_path.unlink(missing_ok=True)
 
 
+def load_editable_artifacts(order_dir: Path, manifest: str | None, output_mode: str) -> list[dict[str, str]]:
+    if manifest is None:
+        if output_mode != "image_first":
+            raise SystemExit("editable output modes require --editable-artifacts-json")
+        return []
+    manifest_path = resolve_within(order_dir, manifest)
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read editable artifacts manifest: {exc}") from exc
+    if not isinstance(payload, list) or not payload:
+        raise SystemExit("editable artifacts manifest must be a non-empty JSON array")
+    artifacts: list[dict[str, str]] = []
+    for index, item in enumerate(payload, start=1):
+        if not isinstance(item, dict) or set(item) != {"path", "role"}:
+            raise SystemExit(f"editable artifact {index} must contain only path and role")
+        path = item.get("path")
+        role = item.get("role")
+        if not isinstance(path, str) or not isinstance(role, str) or role not in EDITABLE_ARTIFACT_ROLES:
+            raise SystemExit(f"editable artifact {index} is invalid")
+        artifact_path = resolve_within(order_dir, path)
+        if not artifact_path.is_file():
+            raise SystemExit(f"editable artifact does not exist: {path}")
+        artifacts.append({"path": path, "sha256": sha256_file(artifact_path), "role": role})
+    return artifacts
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Composite an immutable locked-chrome overlay onto a slide.")
     parser.add_argument("--order-dir", required=True)
@@ -97,6 +139,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-overlay-sha256", required=True)
     parser.add_argument("--output-image", required=True)
     parser.add_argument("--receipt", required=True)
+    parser.add_argument("--output-mode", choices=sorted(OUTPUT_MODES), default="image_first")
+    parser.add_argument(
+        "--editable-artifacts-json",
+        help="Order-relative JSON array of {path, role}; required outside image_first mode.",
+    )
     parser.add_argument("--safe-box", required=True, nargs=4, type=int, metavar=("X", "Y", "W", "H"))
     return parser.parse_args()
 
@@ -108,6 +155,7 @@ def main() -> None:
     overlay_path = resolve_within(order_dir, args.overlay_image)
     output_path = resolve_within(order_dir, args.output_image)
     receipt_path = resolve_within(order_dir, args.receipt)
+    editable_artifacts = load_editable_artifacts(order_dir, args.editable_artifacts_json, args.output_mode)
     if raw_path == output_path:
         raise SystemExit("raw slide and final output paths must be different")
 
@@ -138,12 +186,14 @@ def main() -> None:
     receipt = {
         "job_id": args.job_id,
         "slide_no": args.slide_no,
+        "output_mode": args.output_mode,
         "accepted_attempt": args.accepted_attempt,
         "status": "pass",
         "raw_output_image": args.raw_image,
         "raw_output_sha256": sha256_file(raw_path),
         "final_output_image": args.output_image,
         "final_output_sha256": sha256_file(output_path),
+        "editable_artifacts": editable_artifacts,
         "locked_chrome": {
             "mode": "post_generation_composite",
             "variant_id": args.variant_id,

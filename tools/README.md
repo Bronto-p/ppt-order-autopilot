@@ -30,6 +30,13 @@ python3 tools/init_order.py --title "商业计划书" --contact "客服A"
 python3 tools/init_order.py --title "商业计划书" --contact "客服A" --with-templates
 ```
 
+Codex 中直接制作并返回给 owner：
+
+```bash
+python3 tools/init_order.py --title "美化现有PPT" --with-templates \
+  --execution-mode owner_direct --intake-source workspace_file
+```
+
 `init_order.py` 会初始化本地运行时 ledger 文件：
 
 ```text
@@ -62,6 +69,8 @@ python3 tools/validate_order.py orders/2026-07-05_001_商业计划书 --gate dec
 - `slide_jobs`
 - `visual_qa`
 - `qa`
+- `owner_return_ready`
+- `owner_returned`
 - `delivery`
 - `closeout`
 
@@ -79,6 +88,39 @@ python3 tools/validate_order.py orders/2026-07-05_001_商业计划书 --gate dec
 10. 写入交付物、`qa_result.json` 和 `qa_report.md` 后跑 `--gate qa`。
 11. 发送交付后写入 `08_closeout/`，再跑 `--gate closeout`。
 
+## autopilot.py
+
+Agent 每次先读取并验证当前步骤：
+
+```bash
+python3 tools/autopilot.py next orders/<order>
+```
+
+完成阶段后，校验产物并原子提交状态：
+
+```bash
+python3 tools/autopilot.py commit orders/<order> --to FULL_PRODUCTION
+```
+
+owner-direct 成品通过 QA 并写好 owner return manifest 后：
+
+```bash
+python3 tools/autopilot.py finish orders/<order> --target owner
+```
+
+`finish` 生成的 receipt ID 是 Agent 可以声称完成的必要证据。客户发送仍走独立 send manifest/approval/receipt。
+
+## register_direct_intake.py
+
+对 Codex 附件或用户明确指向的 workspace 文件执行一次性、幂等的 owner-direct intake：复制并复核 hash、生成 evidence indexes、记录 owner instruction approval、完成 promotion 并绑定 active order。它不理解内容，也不生产 PPT。
+如果已有其他 active order，新订单会进入 `pending_order_ids` 并返回 `runnable=false`，不会覆盖全局当前订单。
+
+```bash
+python3 tools/register_direct_intake.py orders/<order> \
+  --source-type workspace_file --prompt-file /tmp/exact-prompt.txt \
+  --file /absolute/path/to/source.pptx
+```
+
 ## composite_locked_chrome.py
 
 将已批准的透明导航/logo/页脚/页码 overlay 精确合成到 accepted raw slide，校验 overlay hash、画布、content safe box 和 opaque pixels，原子写入最终 PNG 与 `finalization.json`。该工具不设计页面内容，只应用已批准的固定 chrome。
@@ -91,7 +133,10 @@ python3 tools/composite_locked_chrome.py \
   --raw-image 05_production/slide_jobs/slide_01/attempt_01_raw.png \
   --overlay-image 05_production/slide_jobs/slide_01/input_images/locked_chrome.png \
   --expected-overlay-sha256 sha256:... \
+  --output-mode image_first \
   --output-image 05_production/origin_image/slide_01.png \
   --receipt 05_production/slide_jobs/slide_01/finalization.json \
   --safe-box 120 140 1680 820
 ```
+
+`hybrid`、`template_native` 或 `editable_reconstruction` 模式还必须传入 `--editable-artifacts-json <order-relative-path>`；该 JSON 是非空数组，每项只含 `path` 和 `role`，工具会自行校验路径并写入实际 hash。

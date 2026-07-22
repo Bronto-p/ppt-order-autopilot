@@ -35,6 +35,7 @@
       "enum": [
         "wecom",
         "codex_attachment",
+        "workspace_file",
         null
       ]
     },
@@ -151,7 +152,7 @@
       "if": {
         "properties": {
           "source_type": {
-            "const": "codex_attachment"
+            "enum": ["codex_attachment", "workspace_file"]
           }
         }
       },

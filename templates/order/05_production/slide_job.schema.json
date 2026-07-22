@@ -9,6 +9,7 @@
     "slide_no",
     "page_type",
     "title",
+    "output_mode",
     "deck_context",
     "local_context",
     "exact_content",
@@ -51,6 +52,14 @@
     "title": {
       "type": "string",
       "minLength": 1
+    },
+    "output_mode": {
+      "enum": [
+        "image_first",
+        "hybrid",
+        "template_native",
+        "editable_reconstruction"
+      ]
     },
     "deck_context": {
       "type": "object",
@@ -326,7 +335,15 @@
       ],
       "properties": {
         "selected_backend": {"type": "string", "minLength": 1},
-        "mode": {"enum": ["reference_guided_generation", "image_edit"]},
+        "mode": {
+          "enum": [
+            "reference_guided_generation",
+            "image_edit",
+            "hybrid_assets",
+            "template_native",
+            "editable_reconstruction"
+          ]
+        },
         "requires_image_inputs": {"const": true}
       },
       "additionalProperties": false
@@ -351,6 +368,8 @@
       "type": "object",
       "required": [
         "reasoning_level",
+        "one_slide_only",
+        "uses_image_generation",
         "image_generation_only",
         "must_not_use_text_only_fallback",
         "if_required_image_missing"
@@ -362,8 +381,14 @@
             "high"
           ]
         },
-        "image_generation_only": {
+        "one_slide_only": {
           "const": true
+        },
+        "uses_image_generation": {
+          "type": "boolean"
+        },
+        "image_generation_only": {
+          "type": "boolean"
         },
         "must_not_use_text_only_fallback": {
           "const": true
