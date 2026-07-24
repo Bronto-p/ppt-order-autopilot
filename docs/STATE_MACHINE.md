@@ -28,6 +28,8 @@ WAITING_OWNER_CONFIRMATION
 ASK_CUSTOMER_OR_ACCEPT_ORDER
 SAMPLE_REQUIRED
 DIRECT_PRODUCTION_ALLOWED
+OWNER_SAMPLE_PRODUCTION
+OWNER_SAMPLE_REVIEW
 SAMPLE_PRODUCTION
 SAMPLE_QA
 WAITING_OWNER_SAMPLE_SEND_CONFIRMATION
@@ -57,6 +59,26 @@ requires_owner_approval
 ```
 
 orchestrator 每次改状态前都要验证旧状态是否允许转到新状态，并确认所需产物和 approval 已存在。
+
+状态不得由 Agent 手工跳写。已有订单先运行 `tools/autopilot.py next`，完成阶段后用 `commit --to <STATE>`；owner-direct 交付必须用 `finish --target owner`。
+
+## Owner-direct 短路径
+
+```text
+IDLE
+  -> DIRECT_INTAKE_STAGED
+  -> BUILDING_TRANSCRIPT
+  -> EXTRACTING_ORDER_BRIEF
+  -> DIRECT_PRODUCTION_ALLOWED
+  -> OWNER_SAMPLE_PRODUCTION
+  -> OWNER_SAMPLE_REVIEW
+  -> FULL_PRODUCTION
+  -> FULL_QA
+  -> OWNER_RETURN_READY
+  -> OWNER_RETURNED
+```
+
+用户 exact prompt 可记录为 `owner_direct_instruction`，只覆盖内部生产范围和 Codex return。设计型 owner-direct 任务必须先生成一张带真实内容的完整幻灯片，在 `OWNER_SAMPLE_REVIEW` 展示并等待当前 preview hash 对应的批准；“完成后返回”不能解释为跳过样稿。纯背景、moodboard、空模板或 style anchor 不满足 gate。`OWNER_RETURNED` 要求 verification receipt；它不允许客户消息、contact 或 send approval 字段。
 
 ## 2. 询单分支
 
@@ -131,13 +153,15 @@ WAITING_OWNER_CONFIRMATION
   -> FULL_PRODUCTION
 ```
 
-样稿是否需要不能默认。必须满足至少一个条件：
+客户样稿分支满足至少一个条件时启用：
 
 - 聊天明确要求样稿。
 - 客服明确要求样稿。
 - 你明确确认先走样稿。
 
 样稿 QA 通过后只是进入“待 owner 批准发送”，不能直接进正稿。发送后必须等客户明确通过；明确小修返回样稿生产，涉及价格、截止、页数或整体风格重置才再问 owner。
+
+这与 owner-direct 的内部样稿审阅是两个不同 gate：owner-direct 不发送客户，但设计型任务仍默认先审完整单页样稿。
 
 ## 6. 正稿分支
 

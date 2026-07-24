@@ -1,6 +1,6 @@
 # Style Kit And Sample Policy
 
-Samples are one source of visual anchors, not a universal gate. Every production path needs a style kit, but direct production may build it from a customer template, source deck, or owner-approved style brief.
+A reviewed complete-slide sample is the visual gate for design-bearing work. For `owner_direct`, the Agent first generates one representative page with real content, shows it in Codex, and waits for approval bound to that preview hash. A background, moodboard, blank template, or internal style anchor is not a sample.
 
 ## Required Style Kit
 
@@ -33,16 +33,19 @@ Samples are one source of visual anchors, not a universal gate. Every production
 
 ## Approval Output
 
-`approved_sample_reference.json` must connect approved sample images to page families, production matching rules, and the evidence-backed `customer_sample_decision.json` that authorized continued production.
+`approved_sample_reference.json` must connect approved complete-page images to page families, production matching rules, and the evidence-backed `owner_sample_decision.json` or `customer_sample_decision.json` that authorized continued production.
 
 Final slides must reference approved sample/style kit images; “按样稿风格做” as text is not enough.
 
-## Direct Production
+## Owner-direct Production
 
-When `sample_required=false`, the style kit records one explicit source type:
+Design-bearing owner-direct work cannot skip the reviewed sample. A customer template, source deck, brand guide, or owner style brief may guide the sample, but none of them replaces approval of the generated complete page.
 
-- `customer_template`
-- `source_deck`
-- `approved_style_brief`
+After approval, the style kit records:
 
-It must still contain `style_anchor.png`, `template_master.png`, page-family references, locked elements, source paths, and the approval ID. Skipping customer-facing samples never permits skipping the internal visual system.
+- `owner_sample_decision.json` and its approval evidence;
+- the exact sample preview path and SHA-256;
+- any template/source-deck/brand-guide inputs used;
+- `style_anchor.png`, `template_master.png`, page-family references, and locked elements extracted from the approved complete page.
+
+The sample and final pages use the same output mode and generation backend. In `image_first`, every worker generates the full page—including all visible content—in one image-generation task; the parent may only add approved deterministic locked chrome.

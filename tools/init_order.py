@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from bootstrap_runtime import bootstrap_runtime
+from bootstrap_runtime import bootstrap_runtime, ledger_root
 
 
 TZ_SHANGHAI = timezone(timedelta(hours=8))
@@ -21,6 +21,8 @@ ORDER_SUBDIRS = [
     "01_chat/ocr",
     "02_attachments_raw/from_chat",
     "02_attachments_raw/from_customer",
+    "02_attachments_raw/from_codex",
+    "02_attachments_raw/from_workspace",
     "03_requirements",
     "04_sample",
     "05_production",
@@ -124,6 +126,9 @@ def create_order(args: argparse.Namespace) -> Path:
     state = {
         "state_version": 1,
         "order_id": order_id,
+        "execution_mode": args.execution_mode,
+        "intake_source": args.intake_source,
+        "delivery_target": "owner_codex" if args.execution_mode == "owner_direct" else "customer_wecom",
         "state": "IDLE",
         "previous_state": None,
         "current_gate": "base",
@@ -156,7 +161,7 @@ def create_order(args: argparse.Namespace) -> Path:
     }
     if not existed_before:
         append_jsonl(order_dir / "00_state" / "events.jsonl", order_event)
-        append_jsonl(project_root / "ledgers" / "orders.jsonl", order_event)
+        append_jsonl(ledger_root(project_root) / "orders.jsonl", order_event)
 
     readme = (
         f"# {args.title}\n\n"
@@ -171,6 +176,37 @@ def create_order(args: argparse.Namespace) -> Path:
 
     if args.with_templates:
         copy_order_templates(project_root, order_dir, args.overwrite_templates)
+        if args.execution_mode == "owner_direct":
+            requirements_path = order_dir / "03_requirements" / "requirements.json"
+            if requirements_path.exists():
+                requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+                for field_name in ["deadline", "price"]:
+                    requirements[field_name]["required"] = False
+                requirements["sample_required"] = {
+                    "value": True,
+                    "evidence": "owner_direct design workflow requires one complete-slide sample before full production",
+                    "confidence": "inferred",
+                    "required": True,
+                }
+                requirements["sample_scope"] = {
+                    "value": "one complete representative slide with real content",
+                    "evidence": "owner_direct sample-first default",
+                    "confidence": "inferred",
+                    "required": True,
+                }
+                requirements["output_mode"] = {
+                    "value": "image_first",
+                    "evidence": "owner_direct design default; non-image-first modes require explicit high-confidence editability evidence",
+                    "confidence": "inferred",
+                    "required": True,
+                }
+                requirements["delivery_target"] = {
+                    "value": "owner_codex",
+                    "evidence": "owner_direct execution profile",
+                    "confidence": "high",
+                    "required": True,
+                }
+                write_json(requirements_path, requirements)
 
     return order_dir
 
@@ -179,6 +215,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create a PPT order folder.")
     parser.add_argument("--title", required=True, help="Human-readable order title.")
     parser.add_argument("--contact", default=None, help="Fixed customer-service contact.")
+    parser.add_argument(
+        "--execution-mode",
+        choices=["customer_order", "owner_direct"],
+        default="customer_order",
+        help="Business workflow or direct owner production in Codex.",
+    )
+    parser.add_argument(
+        "--intake-source",
+        choices=["wecom", "codex_attachment", "workspace_file"],
+        default=None,
+        help="Evidence source used to start this order.",
+    )
     parser.add_argument("--orders-root", default="orders", help="Orders root relative to project root.")
     parser.add_argument("--sequence", type=int, default=None, help="Override daily sequence number.")
     parser.add_argument("--order-id", default=None, help="Override generated order id.")

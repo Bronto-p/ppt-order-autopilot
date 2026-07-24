@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 from pathlib import Path
 
@@ -17,9 +18,14 @@ JSONL_LEDGER_FILES = [
 ]
 
 
+def ledger_root(project_root: Path) -> Path:
+    override = os.environ.get("PPT_AUTOPILOT_LEDGER_ROOT")
+    return Path(override).expanduser().resolve() if override else project_root.resolve() / "ledgers"
+
+
 def bootstrap_runtime(project_root: Path) -> Path:
     project_root = project_root.resolve()
-    ledgers_root = project_root / "ledgers"
+    ledgers_root = ledger_root(project_root)
     ledgers_root.mkdir(parents=True, exist_ok=True)
     for name in JSONL_LEDGER_FILES:
         (ledgers_root / name).touch(exist_ok=True)

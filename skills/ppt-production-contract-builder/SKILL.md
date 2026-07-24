@@ -1,56 +1,21 @@
 ---
 name: ppt-production-contract-builder
-description: "PPT 生产契约构建层。把已确认的 requirements、decision、approval 和附件索引转换成 production_contract.json，生成素材 allowlist 和需求覆盖矩阵。不能自行补需求或使用未批准附件。"
+description: "PPT 生产契约层。把已确认 requirements、真实 owner/customer approval 和附件索引转换成 production_contract.json；支持 image-first、hybrid、template-native、editable reconstruction 和混合页面。"
 ---
 
 # PPT Production Contract Builder
 
-## Purpose
+只从 requirements、evidence index、approval 和明确允许的素材生成 `03_requirements/production_contract.json`。
 
-在接单决策和正式生产之间建立明确接口。它负责把已确认的订单需求转换成 `production_contract.json`，让 production core 只吃干净契约。
+## Approval
 
-## Inputs
+- customer order：要求 `accept_order` 或 `approve_production` approval。
+- owner direct：用户 exact prompt 可形成 order-scoped `owner_direct_instruction` approval；只授权内部生产与返回 owner，不授权客户发送。
 
-- `03_requirements/requirements.json`
-- `03_requirements/decision.md`
-- `03_requirements/pending_approval.json`
-- `00_state/approvals.jsonl`
-- `02_attachments_raw/attachment_index.jsonl`
+## Contract
 
-## Outputs
+冻结 deck goal、audience、language、画布、交付格式、页数策略、内容修改边界和 style source。`method.production_mode` 可为 `image_first`、`hybrid`、`template_native`、`editable_reconstruction` 或 `mixed`；每页必须有自己的 `output_mode`、exact content source、资产和 job path。
 
-- `03_requirements/production_contract.json`
-- 统一结果契约 JSON
+美化/visual redesign 默认冻结为 `image_first`。非 `image_first` 必须与 requirements 中明确、high-confidence 的可编辑或模板要求一致；禁止把模型偏好写成用户要求。样稿和正稿使用同一 output mode 和同一类 backend。
 
-## Required Contract Fields
-
-- `deck.title`
-- `deck.page_count`
-- `deck.aspect_ratio`
-- `deck.deadline`
-- `deck.deliverables`
-- `deck.requirements_source`
-- `method`
-- `style_kit`
-- `style_kit.source_type`
-- `asset_registry`
-- `slides[].slide_no`
-- `slides[].page_type`
-- `slides[].title`
-- `slides[].exact_content_source`
-- `slides[].required_asset_ids`
-- `slides[].job_path`
-- `coverage_matrix`
-- `approval.approval_id`
-
-## Hard Rules
-
-1. 没有 approved approval record，不生成生产契约。
-2. 必填需求缺失时不生成生产契约。
-3. 有未解决冲突时不生成生产契约。
-4. 所有素材必须来自 `attachment_index.jsonl` 或人工确认的本地路径。
-5. 生产契约必须写清楚每个客户要求覆盖到哪些 slide。
-6. 每个 strict client asset 必须分配到具体 slide。
-7. `production_contract.json` 只保存总契约和每页 `job_path`，不内嵌完整执行包。
-8. 每页执行材料由 `ppt-slide-job-packager` 写入 `05_production/slide_jobs/slide_XX/`。
-9. 有样稿时 `style_kit.source_type=approved_sample`；直接生产时必须明确记录客户模板、源 deck 或已批准 style brief，不能留下隐式默认。
+有未解决冲突、缺必需字段、未知 approval 或未索引素材时不生成契约。直接生产也必须建立 style kit，来源只能是客户模板、源 deck 或已批准 style brief。

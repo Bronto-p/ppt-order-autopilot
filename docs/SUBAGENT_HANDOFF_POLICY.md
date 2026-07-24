@@ -32,6 +32,7 @@ Each slide worker receives one self-contained material bundle. Workers must not 
 - `slide_no`
 - `title`
 - `page_type`
+- `output_mode`
 - `deck_context`
 - `local_context`
 - `exact_content`
@@ -57,6 +58,8 @@ Workers should return a result that records:
 {
   "job_id": "2026-07-05_001:slide_07",
   "attempt": 1,
+  "slide_no": 7,
+  "output_mode": "hybrid",
   "status": "success",
   "output_image": "05_production/slide_jobs/slide_07/attempts/attempt_01/output.png",
   "input_images_seen": [
@@ -73,6 +76,13 @@ Workers should return a result that records:
   ],
   "style_match": "pass",
   "text_readability": "pass",
+  "editable_artifacts": [
+    {
+      "path": "05_production/slide_jobs/slide_07/attempts/attempt_01/editable-layer.json",
+      "sha256": "sha256:...",
+      "role": "editable_layer_spec"
+    }
+  ],
   "blockers": []
 }
 ```
@@ -82,7 +92,7 @@ Workers should return a result that records:
 - `job.json` is the immutable base job and uses `attempt: 1`.
 - Every dispatch snapshots the exact job and prompt under `attempts/attempt_XX/` before calling a worker.
 - Parent QA accepts or rejects an attempt; workers never accept their own output.
-- Workers write only an attempt-local raw image. They never write `origin_image/slide_XX.png`.
+- Workers write an attempt-local rendered preview and any mode-required editable artifacts. They never write `origin_image/slide_XX.png`.
 - When `locked_chrome.mode=post_generation_composite`, the worker treats the overlay as a placement/safe-zone reference but does not redraw it. The parent applies the exact overlay after accepting the raw attempt and writes `finalization.json`.
 - A rejected attempt creates `repair_job.json` with failure class, evidence files, narrow repair instructions, and must-preserve constraints.
 - Repair workers receive the base job, the rejected output, QA evidence, and the repair job. They must not reinterpret the customer request.

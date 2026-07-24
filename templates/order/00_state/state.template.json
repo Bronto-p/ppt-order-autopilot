@@ -1,6 +1,9 @@
 {
   "state_version": 1,
   "order_id": "REPLACE_ME",
+  "execution_mode": "customer_order",
+  "intake_source": null,
+  "delivery_target": "customer_wecom",
   "state": "IDLE",
   "previous_state": null,
   "current_gate": "base",

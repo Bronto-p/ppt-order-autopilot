@@ -25,14 +25,24 @@
     "assembly_policy": {
       "type": "object",
       "required": [
-        "full_slide_images_only",
-        "no_native_layout_overrides"
+        "supported_output_modes",
+        "preserve_editable_artifacts"
       ],
       "properties": {
-        "full_slide_images_only": {
-          "const": true
+        "supported_output_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "image_first",
+              "hybrid",
+              "template_native",
+              "editable_reconstruction"
+            ]
+          }
         },
-        "no_native_layout_overrides": {
+        "preserve_editable_artifacts": {
           "const": true
         }
       },

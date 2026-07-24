@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner Codex Return Manifest",
+  "type": "object",
+  "required": [
+    "manifest_id",
+    "order_id",
+    "target",
+    "qa_result_path",
+    "qa_result_sha256",
+    "files",
+    "created_at"
+  ],
+  "properties": {
+    "manifest_id": {"type": "string", "minLength": 1},
+    "order_id": {"type": "string", "minLength": 1},
+    "target": {"const": "owner_codex"},
+    "qa_result_path": {"const": "06_qa/qa_result.json"},
+    "qa_result_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "type"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "type": {"enum": ["pptx", "pdf", "png", "zip", "other"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false
+}

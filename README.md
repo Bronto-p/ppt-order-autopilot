@@ -52,7 +52,9 @@ ppt-order-autopilot/
 
 运行入口和恢复规则见 [Agent Run Loop](docs/AGENT_RUN_LOOP.md)。
 
-也可以直接在 Codex 任务里附上客户文件，让 Agent 自己暂存、建单并继续。具体启动口令、确认节点和定时唤醒说明见 [Codex Usage](docs/CODEX_USAGE.md)。
+也可以直接在 Codex 任务里附上客户文件，或明确指向 workspace 中的文件。Agent 会自动选择 `owner_direct`（在 Codex 中制作并返回给你）或 `customer_order`（带客户承诺与外部发送 gate），自己暂存、建单并继续。具体启动口令、确认节点和定时唤醒说明见 [Codex Usage](docs/CODEX_USAGE.md)。
+
+每个订单步骤由 `tools/autopilot.py next/commit` 校验。owner-direct 设计任务先在 Codex 中展示一张包含真实内容的完整单页样稿，取得与预览 hash 绑定的批准后才生产其余页面；纯背景不能通过。每页默认由图片模型一次生成完整页面。成品只有在 `finish --target owner` 生成 verification receipt 后才能宣告完成。
 
 ### 手动诊断
 

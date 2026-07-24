@@ -85,5 +85,35 @@
     "evidence": null,
     "confidence": "missing",
     "required": false
+  },
+  "job_mode": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "transformation": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "output_mode": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "content_change_policy": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
+  },
+  "delivery_target": {
+    "value": null,
+    "evidence": null,
+    "confidence": "missing",
+    "required": true
   }
 }

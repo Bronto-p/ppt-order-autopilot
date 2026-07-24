@@ -4,14 +4,20 @@
   "type": "object",
   "required": [
     "sample_page_count",
+    "sample_slide_no",
     "sample_goal",
     "use_real_content",
+    "output_mode",
+    "generation_scope",
     "reference_files",
     "approval_id",
     "backend"
   ],
   "properties": {
     "sample_page_count": {
+      "const": 1
+    },
+    "sample_slide_no": {
       "type": "integer",
       "minimum": 1
     },
@@ -23,7 +29,18 @@
       ]
     },
     "use_real_content": {
-      "type": "boolean"
+      "const": true
+    },
+    "output_mode": {
+      "enum": [
+        "image_first",
+        "hybrid",
+        "template_native",
+        "editable_reconstruction"
+      ]
+    },
+    "generation_scope": {
+      "const": "complete_slide"
     },
     "reference_files": {
       "type": "array",
@@ -39,7 +56,9 @@
       "type": "object",
       "required": [
         "selected_backend",
-        "requires_image_inputs"
+        "requires_image_inputs",
+        "uses_image_generation",
+        "image_generation_only"
       ],
       "properties": {
         "selected_backend": {
@@ -47,11 +66,23 @@
           "minLength": 1
         },
         "requires_image_inputs": {
+          "type": "boolean"
+        },
+        "uses_image_generation": {
           "const": true
+        },
+        "image_generation_only": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"output_mode": {"const": "image_first"}}},
+      "then": {"properties": {"backend": {"properties": {"image_generation_only": {"const": true}}}}}
+    }
+  ],
   "additionalProperties": false
 }
